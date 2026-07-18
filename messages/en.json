@@ -1,0 +1,14 @@
+{
+    "nav": {
+        "home": "Home",
+        "blog": "Blog",
+        "projects": "Projects",
+        "about": "About"
+    },
+    "hero": {
+        "title": "Frontend Developer building modern web experiences",
+        "description": "Sharing articles, experiences, and tutorials about React, Next.js, and frontend development.",
+        "primaryButton": "Read Articles",
+        "secondaryButton": "View Projects"
+    }
+}
