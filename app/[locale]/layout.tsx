@@ -1,34 +1,23 @@
-import { notFound } from "next/navigation";
-import { getMessages } from "next-intl/server";
+import AppShell from "@/components/layout/app-shell";
+import HtmlConfig from "@/components/shared/html-config";
+import { ThemeProvider } from "@/components/shared/theme-provider";
 import { NextIntlClientProvider } from "next-intl";
-import Navbar from "@/components/layout/navbar";
-
-const locales = ["fa", "en"];
+import { getMessages } from "next-intl/server";
 
 export default async function LocaleLayout({
   children,
-  params,
 }: {
   children: React.ReactNode;
-  params: Promise<{ locale: string }>;
 }) {
-  const { locale } = await params;
-
-  if (!locales.includes(locale)) {
-    notFound();
-  }
-
   const messages = await getMessages();
 
   return (
     <NextIntlClientProvider messages={messages}>
-      <div
-        dir={locale === "fa" ? "rtl" : "ltr"}
-        lang={locale}
-      >
-        <Navbar />
-        {children}
-      </div>
+      <ThemeProvider>
+        <HtmlConfig />
+
+        <AppShell>{children}</AppShell>
+      </ThemeProvider>
     </NextIntlClientProvider>
   );
 }

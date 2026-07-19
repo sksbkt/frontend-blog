@@ -12,9 +12,7 @@ export function ThemeProvider({
       attribute="class"
       defaultTheme="system"
       enableSystem
-      enableColorScheme
       disableTransitionOnChange
-      storageKey="theme"
       {...props}
     >
       {children}
