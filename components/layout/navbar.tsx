@@ -11,40 +11,26 @@ export default async function Navbar() {
   return (
     <header className="border-b">
       <Container>
-        <nav className="flex h-16 items-center justify-between">
-          {/* Logo */}
+        <nav className="flex h-16 items-center">
           <Logo />
-          {/* Navigation */}
-          <div className="flex items-center gap-6 text-sm font-medium">
-            <Link
-              href={``}
-              className="transition-colors hover:text-primary"
-            >
-              {t("home")}
-            </Link>
 
-            <Link
-              href={`/blog`}
-              className="transition-colors hover:text-primary"
-            >
-              {t("blog")}
-            </Link>
+          <div className="flex flex-1 items-center px-8">
+            <div className="flex items-center gap-6 text-sm font-medium">
+              <Link href="/">{t("home")}</Link>
 
-            <Link
-              href={`/projects`}
-              className="transition-colors hover:text-primary"
-            >
-              {t("projects")}
-            </Link>
+              <Link href="/blog">{t("blog")}</Link>
 
-            <Link
-              href={`/about`}
-              className="transition-colors hover:text-primary"
-            >
-              {t("about")}
-            </Link>
-            <LanguageSwitcher />
-            <ModeToggle />
+              <Link href="/projects">{t("projects")}</Link>
+
+              <Link href="/about">{t("about")}</Link>
+            </div>
+
+            <div className="flex-1" />
+
+            <div className="flex items-center gap-3">
+              <LanguageSwitcher />
+              <ModeToggle />
+            </div>
           </div>
         </nav>
       </Container>

@@ -167,3 +167,6 @@
     opacity: 1;
   }
 }
+
+@custom-variant rtl (&:where([dir="rtl"] *));
+@custom-variant ltr (&:where([dir="ltr"] *));
