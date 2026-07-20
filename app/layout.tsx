@@ -1,5 +1,6 @@
 import "./globals.css";
 import { Vazirmatn } from "next/font/google";
+
 import { ThemeProvider } from "@/components/shared/theme-provider";
 
 const vazir = Vazirmatn({
@@ -15,10 +16,7 @@ export default function RootLayout({
 }) {
   return (
     <html suppressHydrationWarning>
-      <body
-        className={`${vazir.variable} antialiased`}
-        suppressHydrationWarning
-      >
+      <body className={`${vazir.variable} antialiased`}>
         <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>

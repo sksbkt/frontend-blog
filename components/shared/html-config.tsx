@@ -1,17 +1,16 @@
 "use client";
 
 import { useLocale } from "next-intl";
-import { useLayoutEffect } from "react";
+import { useEffect } from "react";
 
 export default function HtmlConfig() {
   const locale = useLocale();
 
-  // ? For Testing
-  // console.log("Locale:", locale);
+  useEffect(() => {
+    const html = document.documentElement;
 
-  useLayoutEffect(() => {
-    document.documentElement.lang = locale;
-    document.documentElement.dir = locale === "fa" ? "rtl" : "ltr";
+    html.lang = locale;
+    html.dir = locale === "fa" ? "rtl" : "ltr";
   }, [locale]);
 
   return null;
