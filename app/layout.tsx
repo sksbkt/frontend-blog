@@ -32,7 +32,6 @@ export default function RootLayout({
           }}
         />
       </head>
-
       <body className={`${vazir.variable} antialiased`}>
         <ThemeProvider>{children}</ThemeProvider>
       </body>

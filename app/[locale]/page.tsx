@@ -1,10 +1,11 @@
-import Container from "@/components/layout/container";
-import Hero from "@/components/sections/hero";
+import Hero from "@/components/home/hero";
+import FeaturedPosts from "@/components/home/featured-posts";
 
-export default function Home() {
+export default function HomePage() {
   return (
-    <Container>
+    <main>
       <Hero />
-    </Container>
+      <FeaturedPosts />
+    </main>
   );
 }

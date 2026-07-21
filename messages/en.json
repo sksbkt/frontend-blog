@@ -6,9 +6,9 @@
         "about": "About"
     },
     "hero": {
-        "title": "Frontend Developer building modern web experiences",
-        "description": "Sharing articles, experiences, and tutorials about React, Next.js, and frontend development.",
-        "primaryButton": "Read Articles",
-        "secondaryButton": "View Projects"
+        "title": "Hi, I'm Ali.",
+        "description": "Frontend developer focused on React, Next.js, and TypeScript. I enjoy building clean, accessible, and well-designed web applications.",
+        "articles": "Read articles",
+        "projects": "View projects"
     }
 }
