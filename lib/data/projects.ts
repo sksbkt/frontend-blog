@@ -12,5 +12,13 @@ export const projects: Project[] = [
     github: "https://github.com/...",
     demo: "https://...",
     featured: true,
+    content: {
+      overview:
+        "A personal developer portfolio and blog focused on modern frontend development, multilingual support, responsive design, and accessible user experiences.",
+      challenges:
+        "One of the main challenges was handling RTL and LTR layouts while keeping theme switching and language transitions smooth without visual flickering.",
+      outcome:
+        "The project provides a responsive multilingual experience with reusable components and a structure that can later be connected to a headless CMS.",
+    },
   },
 ];

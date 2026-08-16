@@ -8,4 +8,9 @@ export type Project = {
   github?: string;
   demo?: string;
   featured: boolean;
+  content?: {
+    overview: string;
+    challenges: string;
+    outcome: string;
+  };
 };
