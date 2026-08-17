@@ -10,5 +10,23 @@
         "description": "Frontend developer focused on React, Next.js, and TypeScript. I enjoy building clean, accessible, and well-designed web applications.",
         "articles": "Read articles",
         "projects": "View projects"
+    },
+    "projects": {
+        "label": "Projects",
+        "title": "Things I've built",
+        "description": "A collection of projects I've built while exploring modern frontend technologies, design systems, performance, and accessibility.",
+        "card": {
+            "demo": "Live Demo",
+            "github": "GitHub"
+        },
+        "page": {
+            "label": "Project",
+            "about": "About the project",
+            "overview": "Overview",
+            "challenges": "Challenges",
+            "outcome": "Outcome",
+            "back": "Back to Projects",
+            "notFound": "Project Not Found"
+        }
     }
 }

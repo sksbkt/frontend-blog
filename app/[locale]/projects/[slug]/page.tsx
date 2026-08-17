@@ -1,13 +1,14 @@
 import Image from "next/image";
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 
+import { Link } from "@/i18n/navigation";
 import { projects } from "@/lib/data/projects";
 import {
   FaGithub as Github,
   FaExternalLinkAlt as ExternalLink,
 } from "react-icons/fa";
-import { Link } from "@/i18n/navigation";
-import { Metadata } from "next";
 
 type ProjectPageProps = {
   params: Promise<{
@@ -19,29 +20,41 @@ type ProjectPageProps = {
 export async function generateMetadata({
   params,
 }: ProjectPageProps): Promise<Metadata> {
-  const { slug } = await params;
+  const { locale, slug } = await params;
+
+  const t = await getTranslations({
+    locale,
+    namespace: "projects",
+  });
 
   const project = projects.find((project) => project.slug === slug);
 
   if (!project) {
     return {
-      title: "Project Not Found",
+      title: t("page.notFound"),
     };
   }
 
+  const language = locale === "fa" ? "fa" : "en";
+
   return {
-    title: project.title,
-    description: project.description,
+    title: project.title[language],
+    description: project.description[language],
   };
 }
+
 export default async function ProjectPage({ params }: ProjectPageProps) {
-  const { slug } = await params;
+  const { locale, slug } = await params;
+
+  const t = await getTranslations("projects");
 
   const project = projects.find((project) => project.slug === slug);
 
   if (!project) {
     notFound();
   }
+
+  const language = locale === "fa" ? "fa" : "en";
 
   return (
     <main className="py-20">
@@ -50,7 +63,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
           <div className="relative aspect-video overflow-hidden">
             <Image
               src={project.image}
-              alt={project.title}
+              alt={project.title[language]}
               fill
               priority
               className="object-cover"
@@ -59,15 +72,15 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
 
           <div className="p-6 md:p-10">
             <span className="text-sm font-medium uppercase tracking-widest text-primary">
-              Project
+              {t("page.label")}
             </span>
 
             <h1 className="mt-3 text-4xl font-bold tracking-tight md:text-5xl">
-              {project.title}
+              {project.title[language]}
             </h1>
 
             <p className="mt-6 max-w-3xl text-lg leading-8 text-muted-foreground">
-              {project.description}
+              {project.description[language]}
             </p>
 
             <div className="mt-8 flex flex-wrap gap-2">
@@ -80,6 +93,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
                 </span>
               ))}
             </div>
+
             <div className="mt-8 flex flex-wrap gap-3">
               {project.github && (
                 <a
@@ -89,7 +103,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
                   className="inline-flex h-10 items-center gap-2 rounded-lg border px-4 text-sm font-medium transition-colors hover:bg-muted"
                 >
                   <Github className="size-4" />
-                  GitHub
+                  {t("card.github")}
                 </a>
               )}
 
@@ -101,49 +115,53 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
                   className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                 >
                   <ExternalLink className="size-4" />
-                  Live Demo
+                  {t("card.demo")}
                 </a>
               )}
             </div>
           </div>
         </div>
+
         <section className="mt-16 grid gap-12 md:grid-cols-3">
           <div className="md:col-span-2">
             <span className="text-sm font-medium uppercase tracking-widest text-primary">
-              About the project
+              {t("page.about")}
             </span>
 
-            <h2 className="mt-2 text-2xl font-bold tracking-tight">Overview</h2>
+            <h2 className="mt-2 text-2xl font-bold tracking-tight">
+              {t("page.overview")}
+            </h2>
 
             <p className="mt-4 text-lg leading-8 text-muted-foreground">
-              {project.content?.overview}
+              {project.content.overview[language]}
             </p>
           </div>
 
           <aside className="space-y-8">
             <div>
-              <h3 className="font-semibold">Challenges</h3>
+              <h3 className="font-semibold">{t("page.challenges")}</h3>
 
               <p className="mt-3 leading-7 text-muted-foreground">
-                {project.content?.challenges}
+                {project.content.challenges[language]}
               </p>
             </div>
 
             <div>
-              <h3 className="font-semibold">Outcome</h3>
+              <h3 className="font-semibold">{t("page.outcome")}</h3>
 
               <p className="mt-3 leading-7 text-muted-foreground">
-                {project.content?.outcome}
+                {project.content.outcome[language]}
               </p>
             </div>
           </aside>
         </section>
+
         <div className="mt-16">
           <Link
             href="/projects"
             className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
-            ← Back to Projects
+            ← {t("page.back")}
           </Link>
         </div>
       </div>
