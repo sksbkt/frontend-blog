@@ -28,5 +28,17 @@
             "back": "Back to Projects",
             "notFound": "Project Not Found"
         }
+    },
+    "blog": {
+        "label": "Blog",
+        "title": "Latest Articles",
+        "description": "Articles about frontend development, React, Next.js, TypeScript, and building better web experiences.",
+        "card": {
+            "minutes": "min read"
+        },
+        "page": {
+            "back": "Back to Blog",
+            "notFound": "Article Not Found"
+        }
     }
 }

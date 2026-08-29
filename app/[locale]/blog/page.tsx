@@ -1,10 +1,10 @@
-import ProjectCard from "@/components/projects/project-card";
 import { getTranslations } from "next-intl/server";
 
-import { projects } from "@/lib/data/projects";
+import ArticleCard from "@/components/blog/article-card";
+import { posts } from "@/lib/data/posts";
 
-export default async function ProjectsPage() {
-  const t = await getTranslations("projects");
+export default async function BlogPage() {
+  const t = await getTranslations("blog");
 
   return (
     <main className="py-20">
@@ -24,10 +24,10 @@ export default async function ProjectsPage() {
         </div>
 
         <div className="grid gap-8 md:grid-cols-2">
-          {projects.map((project) => (
-            <ProjectCard
-              key={project.id}
-              project={project}
+          {posts.map((post) => (
+            <ArticleCard
+              key={post.id}
+              post={post}
             />
           ))}
         </div>
