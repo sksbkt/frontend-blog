@@ -27,12 +27,20 @@
             "outcome": "Outcome",
             "back": "Back to Projects",
             "notFound": "Project Not Found"
+        },
+        "featured": {
+            "label": "Projects",
+            "title": "Featured Projects",
+            "description": "A selection of projects I've built with modern frontend technologies, focusing on performance, accessibility, and user experience."
         }
     },
     "blog": {
         "label": "Blog",
         "title": "Latest Articles",
         "description": "Articles about frontend development, React, Next.js, TypeScript, and building better web experiences.",
+        "featured": {
+            "title": "Latest Articles"
+        },
         "card": {
             "minutes": "min read"
         },
@@ -40,5 +48,45 @@
             "back": "Back to Blog",
             "notFound": "Article Not Found"
         }
+    },
+    "about": {
+        "label": "About",
+        "title": "A little about me",
+        "description": "I'm a frontend developer who enjoys turning ideas into clean, accessible, and well-designed web experiences.",
+        "story": {
+            "title": "My story",
+            "paragraph1": "I'm focused on modern frontend development and enjoy working with React, Next.js, and TypeScript.",
+            "paragraph2": "I care about writing maintainable code, building responsive interfaces, and creating experiences that feel simple and intuitive."
+        },
+        "skills": {
+            "title": "Skills & technologies"
+        },
+        "contact": {
+            "title": "Let's work together",
+            "description": "Have a project in mind or just want to say hello? I'd be happy to hear from you.",
+            "button": "Get in touch"
+        }
+    },
+    "skills": {
+        "label": "Skills",
+        "title": "Technologies I enjoy working with",
+        "description": "A collection of the tools and technologies I use to build fast, accessible, and scalable web applications.",
+        "categories": {
+            "frontend": "Frontend",
+            "backend": "Backend",
+            "tools": "Tools"
+        }
+    },
+    "homeAbout": {
+        "label": "About",
+        "title": "Building thoughtful digital experiences",
+        "paragraph1": "I'm Ali, a frontend developer focused on creating modern, responsive, and accessible web applications. I enjoy turning ideas into polished interfaces using React, Next.js, and TypeScript.",
+        "paragraph2": "My focus is writing clean code, creating smooth user experiences, and continuously improving my skills through real-world projects."
+    },
+    "homeContact": {
+        "label": "Contact",
+        "title": "Let's build something together",
+        "description": "I'm always interested in discussing new projects, ideas, and opportunities. Feel free to reach out.",
+        "button": "Email Me"
     }
 }
