@@ -25,7 +25,7 @@ export default function Hero() {
             <Link href="/blog">
               <Button>
                 {t("articles")}
-                <ArrowRight className="ml-2 h-4 w-4" />
+                <ArrowRight className="ms-2 h-4 w-4 rtl:rotate-180" />
               </Button>
             </Link>
 

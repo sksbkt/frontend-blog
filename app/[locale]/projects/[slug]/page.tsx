@@ -1,3 +1,4 @@
+import { ArrowLeft } from "lucide-react";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
@@ -16,6 +17,15 @@ type ProjectPageProps = {
     slug: string;
   }>;
 };
+
+export async function generateStaticParams() {
+  return ["en", "fa"].flatMap((locale) =>
+    projects.map((project) => ({
+      locale,
+      slug: project.slug,
+    })),
+  );
+}
 
 export async function generateMetadata({
   params,
@@ -159,9 +169,10 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
         <div className="mt-16">
           <Link
             href="/projects"
-            className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+            className="inline-flex items-center gap-1.5 text-sm font-medium leading-none text-muted-foreground transition-colors hover:text-foreground"
           >
-            ← {t("page.back")}
+            <ArrowLeft className="size-4 shrink-0 translate-y-px rtl:rotate-180" />
+            <span>{t("page.back")}</span>
           </Link>
         </div>
       </div>

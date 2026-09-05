@@ -1,3 +1,4 @@
+import { ArrowRight } from "lucide-react";
 import Image from "next/image";
 import { getLocale, getTranslations } from "next-intl/server";
 
@@ -62,9 +63,11 @@ export default async function ProjectCard({ project }: ProjectCardProps) {
             href={project.demo}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sm font-medium text-primary hover:underline"
+            className="inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap text-sm font-medium leading-none hover:underline"
           >
-            {t("demo")} →
+            <span>{t("demo")}</span>
+
+            <ArrowRight className="size-4 shrink-0 -translate-y-px rtl:rotate-180" />
           </a>
         )}
 

@@ -45,7 +45,6 @@ export const projects: Project[] = [
       fa: "یک داشبورد واکنش‌گرا برای مدیریت وظایف با قابلیت فیلتر کردن، پیگیری وضعیت و رابط کاربری ساده و متمرکز بر بهره‌وری.",
     },
     image: "/images/projects/frontend-blog.jpg",
-
     technologies: ["Next.js", "TypeScript", "Tailwind"],
     github: "https://github.com/...",
     demo: "https://...",
@@ -78,7 +77,6 @@ export const projects: Project[] = [
       fa: "یک اپلیکیشن مدرن آب‌وهوا با تمرکز بر معماری اطلاعات ساده، طراحی واکنش‌گرا و رابط کاربری قابل دسترس.",
     },
     image: "/images/projects/frontend-blog.jpg",
-
     technologies: ["React", "TypeScript", "Tailwind", "API"],
     github: "https://github.com/...",
     demo: "https://...",

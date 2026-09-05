@@ -1,5 +1,7 @@
-import { socialLinks } from "@/lib/data/links";
+import { Mail } from "lucide-react";
 import { getTranslations } from "next-intl/server";
+
+import { socialLinks } from "@/lib/data/links";
 
 export default async function AboutPage() {
   const t = await getTranslations("about");
@@ -49,12 +51,13 @@ export default async function AboutPage() {
                   key={skill}
                   className="rounded-full bg-muted px-3 py-1.5 text-sm"
                 >
-                  {skill}
+                  <span className="inline-block translate-y-px">{skill}</span>
                 </span>
               ))}
             </div>
           </aside>
         </section>
+
         <section className="mt-20 rounded-2xl border bg-card p-8 md:p-10">
           <div className="max-w-2xl">
             <h2 className="text-2xl font-bold tracking-tight md:text-3xl">
@@ -67,8 +70,9 @@ export default async function AboutPage() {
 
             <a
               href={socialLinks.email.mailto}
-              className="mt-6 inline-flex h-10 items-center rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+              className="mt-6 inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             >
+              <Mail className="size-4" />
               {t("contact.button")}
             </a>
           </div>

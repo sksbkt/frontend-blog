@@ -4,6 +4,7 @@ import { getTranslations } from "next-intl/server";
 
 export default async function FeaturedPosts() {
   const t = await getTranslations("blog");
+  const featuredPosts = posts.filter((post) => post.featured);
 
   return (
     <section className="py-16">
@@ -15,7 +16,7 @@ export default async function FeaturedPosts() {
         </div>
 
         <div className="grid gap-6 md:grid-cols-2">
-          {posts.map((post) => (
+          {featuredPosts.map((post) => (
             <ArticleCard
               key={post.id}
               post={post}
