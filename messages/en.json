@@ -88,5 +88,12 @@
         "title": "Let's build something together",
         "description": "I'm always interested in discussing new projects, ideas, and opportunities. Feel free to reach out.",
         "button": "Email Me"
+    },
+    "footer": {
+        "role": "Frontend Developer",
+        "github": "GitHub",
+        "linkedin": "LinkedIn",
+        "email": "Email",
+        "copyright": "All rights reserved."
     }
 }

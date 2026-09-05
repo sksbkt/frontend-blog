@@ -1,3 +1,4 @@
+import { socialLinks } from "@/lib/data/links";
 import { getTranslations } from "next-intl/server";
 
 export default async function AboutPage() {
@@ -65,7 +66,7 @@ export default async function AboutPage() {
             </p>
 
             <a
-              href="mailto:saeedkh.dev@gmail.com"
+              href={socialLinks.email.mailto}
               className="mt-6 inline-flex h-10 items-center rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             >
               {t("contact.button")}

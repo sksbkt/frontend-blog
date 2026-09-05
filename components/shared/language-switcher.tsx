@@ -2,7 +2,7 @@
 
 import { useLocale } from "next-intl";
 import { usePathname, useRouter } from "@/i18n/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 
 import { Button } from "@/components/ui/button";
 
@@ -11,9 +11,9 @@ export function LanguageSwitcher() {
   const router = useRouter();
   const pathname = usePathname();
 
-  function switchLanguage() {
-    const nextLocale = locale === "fa" ? "en" : "fa";
+  const nextLocale = locale === "fa" ? "en" : "fa";
 
+  function switchLanguage() {
     router.replace(pathname, {
       locale: nextLocale,
     });
@@ -24,28 +24,18 @@ export function LanguageSwitcher() {
       variant="outline"
       size="icon"
       onClick={switchLanguage}
+      aria-label={`Switch language to ${nextLocale.toUpperCase()}`}
     >
       <AnimatePresence mode="wait">
         <motion.span
           key={locale}
-          initial={{
-            opacity: 0,
-            y: 8,
-          }}
-          animate={{
-            opacity: 1,
-            y: 0,
-          }}
-          exit={{
-            opacity: 0,
-            y: -8,
-          }}
-          transition={{
-            duration: 0.2,
-          }}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -8 }}
+          transition={{ duration: 0.2 }}
           className="text-xs font-medium leading-none"
         >
-          {locale.toUpperCase()}
+          {nextLocale.toUpperCase()}
         </motion.span>
       </AnimatePresence>
     </Button>

@@ -1,16 +1,16 @@
+import { socialLinks } from "@/lib/data/links";
 import { getTranslations } from "next-intl/server";
-import { FaGithub as Github, FaLinkedin as Linkedin } from "react-icons/fa";
 
-const socialLinks = [
+const links = [
   {
-    name: "GitHub",
-    href: "https://github.com",
-    icon: Github,
+    name: socialLinks.github.name,
+    href: socialLinks.github.link,
+    icon: socialLinks.github.icon,
   },
   {
-    name: "LinkedIn",
-    href: "https://linkedin.com",
-    icon: Linkedin,
+    name: socialLinks.linkedin.name,
+    href: socialLinks.linkedin.link,
+    icon: socialLinks.linkedin.icon,
   },
 ];
 
@@ -38,7 +38,7 @@ export default async function About() {
           </p>
 
           <div className="mt-8 flex gap-4">
-            {socialLinks.map(({ name, href, icon: Icon }) => (
+            {links.map(({ name, href, icon: Icon }) => (
               <a
                 key={name}
                 href={href}

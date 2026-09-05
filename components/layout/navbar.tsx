@@ -1,12 +1,12 @@
-import { getTranslations, getLocale } from "next-intl/server";
+import { getTranslations } from "next-intl/server";
 import { ModeToggle } from "@/components/shared/mode-toggle";
 import { LanguageSwitcher } from "@/components/shared/language-switcher";
 import Container from "@/components/layout/container";
 import Logo from "@/components/layout/logo";
 import { Link } from "@/i18n/navigation";
+
 export default async function Navbar() {
   const t = await getTranslations("nav");
-  const locale = await getLocale();
 
   return (
     <header className="border-b">
@@ -17,11 +17,8 @@ export default async function Navbar() {
           <div className="flex flex-1 items-center px-8">
             <div className="flex items-center gap-6 text-sm font-medium">
               <Link href="/">{t("home")}</Link>
-
               <Link href="/blog">{t("blog")}</Link>
-
               <Link href="/projects">{t("projects")}</Link>
-
               <Link href="/about">{t("about")}</Link>
             </div>
 

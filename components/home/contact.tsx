@@ -1,5 +1,6 @@
 import { getTranslations } from "next-intl/server";
 import { Mail } from "lucide-react";
+import { socialLinks } from "@/lib/data/links";
 
 export default async function Contact() {
   const t = await getTranslations("homeContact");
@@ -22,7 +23,7 @@ export default async function Contact() {
             </p>
 
             <a
-              href="mailto:saeedkh.dev@gmail.com"
+              href={socialLinks.email.mailto}
               className="mt-8 inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
             >
               <Mail className="size-4" />
