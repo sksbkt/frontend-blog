@@ -1,10 +1,15 @@
-import { getTranslations } from "next-intl/server";
+import {getTranslations} from "next-intl/server";
 
 import ArticleCard from "@/components/blog/article-card";
-import { posts } from "@/lib/data/posts";
+import {client} from "@/lib/sanity/client";
+import {mapSanityPost} from "@/lib/sanity/mappers";
+import {postsQuery} from "@/lib/sanity/queries";
 
 export default async function BlogPage() {
   const t = await getTranslations("blog");
+
+  const sanityPosts = await client.fetch(postsQuery);
+  const posts = sanityPosts.map(mapSanityPost);
 
   return (
     <main className="py-20">

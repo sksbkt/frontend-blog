@@ -1,11 +1,19 @@
+import localFont from "next/font/local";
 import { notFound } from "next/navigation";
 import { getMessages } from "next-intl/server";
 import { NextIntlClientProvider } from "next-intl";
 
+import "../globals.css";
 import AppShell from "@/components/layout/app-shell";
-import HtmlConfig from "@/components/shared/html-config";
+import { ThemeProvider } from "@/components/shared/theme-provider";
 
-const locales = ["fa", "en"];
+const vazir = localFont({
+  src: "../../fonts/Vazirmatn-Regular.ttf",
+  variable: "--font-vazir",
+  display: "swap",
+});
+
+const locales = ["fa", "en"] as const;
 
 export default async function LocaleLayout({
   children,
@@ -16,16 +24,25 @@ export default async function LocaleLayout({
 }) {
   const { locale } = await params;
 
-  if (!locales.includes(locale)) {
+  if (!locales.includes(locale as (typeof locales)[number])) {
     notFound();
   }
 
   const messages = await getMessages();
 
   return (
-    <NextIntlClientProvider messages={messages}>
-      <HtmlConfig />
-      <AppShell>{children}</AppShell>
-    </NextIntlClientProvider>
+    <html
+      lang={locale}
+      dir={locale === "fa" ? "rtl" : "ltr"}
+      suppressHydrationWarning
+    >
+      <body className={`${vazir.variable} antialiased`}>
+        <ThemeProvider>
+          <NextIntlClientProvider messages={messages}>
+            <AppShell>{children}</AppShell>
+          </NextIntlClientProvider>
+        </ThemeProvider>
+      </body>
+    </html>
   );
 }

@@ -3,12 +3,12 @@ import { MdOutlineEmail } from "react-icons/md";
 export const socialLinks = {
   github: {
     name: "GitHub",
-    link: "https://github.com",
+    link: "https://github.com/sksbkt",
     icon: Github,
   },
   linkedin: {
     name: "LinkedIn",
-    link: "https://linkedin.com",
+    link: "https://www.linkedin.com/in/ali-khoshbakht",
     icon: Linkedin,
   },
   email: {

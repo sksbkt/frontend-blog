@@ -6,12 +6,12 @@ export const siteConfig = {
   url: "https://your-domain.com",
 
   author: {
-    name: "Your Name",
-    email: "you@example.com",
+    name: "Ali",
+    email: "saeedkh.dev@gmail.com",
   },
 
   links: {
-    github: "https://github.com/yourusername",
-    linkedin: "https://linkedin.com/in/yourusername",
+    github: "https://github.com/sksbkt",
+    linkedin: "https://www.linkedin.com/in/ali-khoshbakht",
   },
 } as const;
