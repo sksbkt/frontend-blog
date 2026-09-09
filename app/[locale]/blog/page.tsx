@@ -1,14 +1,18 @@
-import {getTranslations} from "next-intl/server";
+import { getTranslations } from "next-intl/server";
 
 import ArticleCard from "@/components/blog/article-card";
-import {client} from "@/lib/sanity/client";
-import {mapSanityPost} from "@/lib/sanity/mappers";
-import {postsQuery} from "@/lib/sanity/queries";
+import { client } from "@/lib/sanity/client";
+import { mapSanityPost } from "@/lib/sanity/mappers";
+import { postsQuery } from "@/lib/sanity/queries";
+
+// export const dynamic = "force-dynamic";
 
 export default async function BlogPage() {
   const t = await getTranslations("blog");
 
-  const sanityPosts = await client.fetch(postsQuery);
+  const sanityPosts: Parameters<typeof mapSanityPost>[0][] =
+    await client.fetch(postsQuery);
+
   const posts = sanityPosts.map(mapSanityPost);
 
   return (

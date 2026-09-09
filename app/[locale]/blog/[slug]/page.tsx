@@ -5,8 +5,25 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 
 import { Link } from "@/i18n/navigation";
-import { posts } from "@/lib/data/posts";
+import { client } from "@/lib/sanity/client";
+import { mapSanityPost } from "@/lib/sanity/mappers";
 import { highlightCode } from "@/lib/shiki";
+
+const postBySlugQuery = `*[
+  _type == "post" &&
+  slug.current == $slug
+][0] {
+  _id,
+  title,
+  slug,
+  excerpt,
+  coverImage,
+  publishedAt,
+  readingTime,
+  tags,
+  featured,
+  body
+}`;
 
 type ArticlePageProps = {
   params: Promise<{
@@ -15,13 +32,21 @@ type ArticlePageProps = {
   }>;
 };
 
-export async function generateStaticParams() {
-  return ["en", "fa"].flatMap((locale) =>
-    posts.map((post) => ({
-      locale,
-      slug: post.slug,
-    })),
-  );
+async function getPost(slug: string) {
+  const sanityPost: Parameters<typeof mapSanityPost>[0] | null =
+    await client.fetch(
+      postBySlugQuery,
+      { slug },
+      {
+        // cache: "no-store",
+      },
+    );
+
+  if (!sanityPost) {
+    return null;
+  }
+
+  return mapSanityPost(sanityPost);
 }
 
 export async function generateMetadata({
@@ -29,7 +54,7 @@ export async function generateMetadata({
 }: ArticlePageProps): Promise<Metadata> {
   const { locale, slug } = await params;
 
-  const post = posts.find((post) => post.slug === slug);
+  const post = await getPost(slug);
 
   if (!post) {
     const t = await getTranslations({
@@ -55,7 +80,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
 
   const t = await getTranslations("blog");
 
-  const post = posts.find((post) => post.slug === slug);
+  const post = await getPost(slug);
 
   if (!post) {
     notFound();
@@ -88,15 +113,17 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   return (
     <main className="py-20">
       <article className="mx-auto max-w-4xl px-6">
-        <div className="relative aspect-video overflow-hidden rounded-2xl">
-          <Image
-            src={post.image}
-            alt={post.title[language]}
-            fill
-            priority
-            className="object-cover"
-          />
-        </div>
+        {post.image && (
+          <div className="relative aspect-video overflow-hidden rounded-2xl">
+            <Image
+              src={post.image}
+              alt={post.title[language]}
+              fill
+              priority
+              className="object-cover"
+            />
+          </div>
+        )}
 
         <header className="mt-10">
           <div className="flex flex-wrap gap-2">

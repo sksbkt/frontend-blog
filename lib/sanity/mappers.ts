@@ -1,9 +1,22 @@
-import type {BlogContentBlock, BlogPost} from "@/types/blog";
-import {urlFor} from "./client";
+import type { BlogContentBlock, BlogPost } from "@/types/blog";
+import { urlFor } from "./client";
 
 type SanityTextValue = {
   en?: string;
   fa?: string;
+};
+
+type SanityPortableTextChild = {
+  text?: string;
+};
+
+type SanityPortableTextBlock = {
+  _type?: string;
+  children?: SanityPortableTextChild[];
+  listItem?: string;
+  style?: string;
+  language?: string;
+  code?: string;
 };
 
 type SanityPost = {
@@ -24,23 +37,25 @@ type SanityPost = {
   };
 };
 
-function getBlockText(block: any): string {
-  return (
-    block?.children
-      ?.map((child: any) => child?.text ?? "")
-      .join("") ?? ""
-  );
+function isPortableTextBlock(block: unknown): block is SanityPortableTextBlock {
+  return typeof block === "object" && block !== null;
 }
 
-function mapPortableText(
-  blocks: unknown[] | undefined,
-): BlogContentBlock[] {
+function getBlockText(block: SanityPortableTextBlock): string {
+  return block.children?.map((child) => child.text ?? "").join("") ?? "";
+}
+
+function mapPortableText(blocks: unknown[] | undefined): BlogContentBlock[] {
   if (!blocks) return [];
 
   const result: BlogContentBlock[] = [];
 
-  for (const block of blocks as any[]) {
-    if (block?._type === "code") {
+  for (const rawBlock of blocks) {
+    if (!isPortableTextBlock(rawBlock)) continue;
+
+    const block = rawBlock;
+
+    if (block._type === "code") {
       result.push({
         type: "code",
         language: block.language ?? "text",
@@ -50,7 +65,7 @@ function mapPortableText(
       continue;
     }
 
-    if (block?._type !== "block") continue;
+    if (block._type !== "block") continue;
 
     const text = getBlockText(block);
 
@@ -101,7 +116,93 @@ function mapPortableText(
   return result;
 }
 
+function mergeLocalizedContent(
+  englishBlocks: BlogContentBlock[],
+  persianBlocks: BlogContentBlock[],
+): BlogContentBlock[] {
+  const result: BlogContentBlock[] = [];
+  const maxLength = Math.max(englishBlocks.length, persianBlocks.length);
+
+  for (let index = 0; index < maxLength; index++) {
+    const english = englishBlocks[index];
+    const persian = persianBlocks[index];
+
+    if (!english && persian) {
+      result.push(persian);
+      continue;
+    }
+
+    if (english && !persian) {
+      result.push(english);
+      continue;
+    }
+
+    if (!english || !persian) continue;
+
+    if (english.type === "code" && persian.type === "code") {
+      result.push(english);
+      continue;
+    }
+
+    if (english.type === "heading" && persian.type === "heading") {
+      result.push({
+        type: "heading",
+        content: {
+          en: english.content.en,
+          fa: persian.content.fa,
+        },
+      });
+
+      continue;
+    }
+
+    if (english.type === "paragraph" && persian.type === "paragraph") {
+      result.push({
+        type: "paragraph",
+        content: {
+          en: english.content.en,
+          fa: persian.content.fa,
+        },
+      });
+
+      continue;
+    }
+
+    if (english.type === "list" && persian.type === "list") {
+      const items: { en: string; fa: string }[] = [];
+      const itemCount = Math.max(
+        english.content.length,
+        persian.content.length,
+      );
+
+      for (let itemIndex = 0; itemIndex < itemCount; itemIndex++) {
+        const englishItem = english.content[itemIndex];
+        const persianItem = persian.content[itemIndex];
+
+        items.push({
+          en: englishItem?.en ?? "",
+          fa: persianItem?.fa ?? "",
+        });
+      }
+
+      result.push({
+        type: "list",
+        content: items,
+      });
+
+      continue;
+    }
+
+    result.push(english);
+  }
+
+  return result;
+}
+
 export function mapSanityPost(post: SanityPost): BlogPost {
+  const englishContent = mapPortableText(post.body?.en);
+  const persianContent = mapPortableText(post.body?.fa);
+
   return {
     id: post._id,
     title: {
@@ -113,29 +214,11 @@ export function mapSanityPost(post: SanityPost): BlogPost {
       en: post.excerpt?.en ?? "",
       fa: post.excerpt?.fa ?? "",
     },
-    image: post.coverImage
-      ? urlFor(post.coverImage).width(1200).url()
-      : "",
+    image: post.coverImage ? urlFor(post.coverImage).width(1200).url() : "",
     publishedAt: post.publishedAt,
     readingTime: post.readingTime,
     tags: post.tags ?? [],
     featured: post.featured ?? false,
-    content: [
-      ...mapPortableText(post.body?.en).map((block) => ({
-        ...block,
-        content:
-          block.type === "code"
-            ? block.content
-            : Array.isArray(block.content)
-              ? block.content.map((item) => ({
-                  en: item.en,
-                  fa: item.fa,
-                }))
-              : {
-                  en: block.content.en,
-                  fa: block.content.fa,
-                },
-      })),
-    ],
+    content: mergeLocalizedContent(englishContent, persianContent),
   };
 }
