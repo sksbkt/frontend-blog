@@ -38,7 +38,7 @@ async function getPost(slug: string) {
       postBySlugQuery,
       { slug },
       {
-        // cache: "no-store",
+        cache: "no-store",
       },
     );
 

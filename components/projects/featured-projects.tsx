@@ -1,7 +1,8 @@
 import { getTranslations } from "next-intl/server";
 
+import FeaturedProjectsMotion from "@/components/projects/featured-projects-motion";
 import ProjectCard from "@/components/projects/project-card";
-import { client } from "@/lib/sanity/client";
+import { freshClient } from "@/lib/sanity/client";
 import { mapSanityProject } from "@/lib/sanity/mappers";
 
 const featuredProjectsQuery = `*[
@@ -26,37 +27,39 @@ export default async function FeaturedProjects() {
   const t = await getTranslations("projects");
 
   const sanityProjects: Parameters<typeof mapSanityProject>[0][] =
-    await client.fetch(featuredProjectsQuery);
+    await freshClient.fetch(featuredProjectsQuery);
 
   const featuredProjects = sanityProjects.map(mapSanityProject);
 
   return (
     <section className="py-20">
       <div className="mx-auto max-w-6xl px-6">
-        <div className="mb-10 flex items-end justify-between">
-          <div>
-            <span className="text-sm font-medium uppercase tracking-widest text-primary">
-              {t("featured.label")}
-            </span>
+        <FeaturedProjectsMotion
+          title={
+            <div className="mb-10 flex items-end justify-between">
+              <div>
+                <span className="text-sm font-medium uppercase tracking-widest text-primary">
+                  {t("featured.label")}
+                </span>
 
-            <h2 className="mt-2 text-3xl font-bold tracking-tight">
-              {t("featured.title")}
-            </h2>
+                <h2 className="mt-2 text-3xl font-bold tracking-tight">
+                  {t("featured.title")}
+                </h2>
 
-            <p className="mt-3 max-w-2xl text-muted-foreground">
-              {t("featured.description")}
-            </p>
-          </div>
-        </div>
-
-        <div className="grid gap-8 md:grid-cols-2">
+                <p className="mt-3 max-w-2xl text-muted-foreground">
+                  {t("featured.description")}
+                </p>
+              </div>
+            </div>
+          }
+        >
           {featuredProjects.map((project) => (
             <ProjectCard
               key={project.id}
               project={project}
             />
           ))}
-        </div>
+        </FeaturedProjectsMotion>
       </div>
     </section>
   );

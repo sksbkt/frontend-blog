@@ -24,7 +24,7 @@ export default async function ArticleCard({ post }: ArticleCardProps) {
   ).format(new Date(post.publishedAt));
 
   return (
-    <article className="group relative overflow-hidden rounded-xl border bg-card transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
+    <article className="group relative overflow-hidden rounded-xl border bg-card transition-shadow duration-300 hover:shadow-lg">
       <Link
         href={`/blog/${post.slug}`}
         className="block"

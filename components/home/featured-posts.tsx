@@ -1,7 +1,8 @@
 import { getTranslations } from "next-intl/server";
 
 import ArticleCard from "@/components/blog/article-card";
-import { client } from "@/lib/sanity/client";
+import FeaturedPostsMotion from "@/components/home/featured-posts-motion";
+import { freshClient } from "@/lib/sanity/client";
 import { mapSanityPost } from "@/lib/sanity/mappers";
 
 const featuredPostsQuery = `*[
@@ -26,27 +27,20 @@ export default async function FeaturedPosts() {
   const t = await getTranslations("blog");
 
   const sanityPosts: Parameters<typeof mapSanityPost>[0][] =
-    await client.fetch(featuredPostsQuery);
+    await freshClient.fetch(featuredPostsQuery);
 
   const featuredPosts = sanityPosts.map(mapSanityPost);
 
   return (
     <section className="py-16">
       <div className="mx-auto max-w-6xl space-y-8 px-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-semibold tracking-tight">
-            {t("featured.title")}
-          </h2>
-        </div>
-
-        <div className="grid gap-6 md:grid-cols-2">
+        <FeaturedPostsMotion title={t("featured.title")}>
           {featuredPosts.map((post) => (
-            <ArticleCard
-              key={post.id}
-              post={post}
-            />
+            <div key={post.id}>
+              <ArticleCard post={post} />
+            </div>
           ))}
-        </div>
+        </FeaturedPostsMotion>
       </div>
     </section>
   );
