@@ -3,13 +3,14 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
-
-import { Link } from "@/i18n/navigation";
-import { projects } from "@/lib/data/projects";
 import {
   FaGithub as Github,
   FaExternalLinkAlt as ExternalLink,
 } from "react-icons/fa";
+
+import { Link } from "@/i18n/navigation";
+import { client } from "@/lib/sanity/client";
+import { mapSanityProject } from "@/lib/sanity/mappers";
 
 type ProjectPageProps = {
   params: Promise<{
@@ -18,13 +19,38 @@ type ProjectPageProps = {
   }>;
 };
 
-export async function generateStaticParams() {
-  return ["en", "fa"].flatMap((locale) =>
-    projects.map((project) => ({
-      locale,
-      slug: project.slug,
-    })),
+const projectBySlugQuery = `*[
+  _type == "project" &&
+  slug.current == $slug
+][0] {
+  _id,
+  title,
+  slug,
+  description,
+  image,
+  technologies,
+  github,
+  demo,
+  featured,
+  content
+}`;
+
+export const dynamic = "force-dynamic";
+
+async function getProject(slug: string) {
+  const sanityProject = await client.fetch(
+    projectBySlugQuery,
+    { slug },
+    {
+      cache: "no-store",
+    },
   );
+
+  if (!sanityProject) {
+    return null;
+  }
+
+  return mapSanityProject(sanityProject);
 }
 
 export async function generateMetadata({
@@ -37,7 +63,7 @@ export async function generateMetadata({
     namespace: "projects",
   });
 
-  const project = projects.find((project) => project.slug === slug);
+  const project = await getProject(slug);
 
   if (!project) {
     return {
@@ -58,7 +84,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
 
   const t = await getTranslations("projects");
 
-  const project = projects.find((project) => project.slug === slug);
+  const project = await getProject(slug);
 
   if (!project) {
     notFound();
@@ -70,15 +96,17 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     <main className="py-20">
       <div className="mx-auto max-w-6xl px-6">
         <div className="overflow-hidden rounded-2xl border bg-card">
-          <div className="relative aspect-video overflow-hidden">
-            <Image
-              src={project.image}
-              alt={project.title[language]}
-              fill
-              priority
-              className="object-cover"
-            />
-          </div>
+          {project.image && (
+            <div className="relative aspect-video overflow-hidden">
+              <Image
+                src={project.image}
+                alt={project.title[language]}
+                fill
+                priority
+                className="object-cover"
+              />
+            </div>
+          )}
 
           <div className="p-6 md:p-10">
             <span className="text-sm font-medium uppercase tracking-widest text-primary">

@@ -1,4 +1,6 @@
 import type { BlogContentBlock, BlogPost } from "@/types/blog";
+import type { Project } from "@/types/project";
+
 import { urlFor } from "./client";
 
 type SanityTextValue = {
@@ -34,6 +36,25 @@ type SanityPost = {
   body?: {
     en?: unknown[];
     fa?: unknown[];
+  };
+};
+
+type SanityProject = {
+  _id: string;
+  title: SanityTextValue;
+  slug: {
+    current: string;
+  };
+  description: SanityTextValue;
+  image?: unknown;
+  technologies?: string[];
+  github?: string;
+  demo?: string;
+  featured?: boolean;
+  content?: {
+    overview?: SanityTextValue;
+    challenges?: SanityTextValue;
+    outcome?: SanityTextValue;
   };
 };
 
@@ -220,5 +241,50 @@ export function mapSanityPost(post: SanityPost): BlogPost {
     tags: post.tags ?? [],
     featured: post.featured ?? false,
     content: mergeLocalizedContent(englishContent, persianContent),
+  };
+}
+
+export function mapSanityProject(project: SanityProject): Project {
+  return {
+    id: project._id,
+
+    title: {
+      en: project.title?.en ?? "",
+      fa: project.title?.fa ?? "",
+    },
+
+    slug: project.slug?.current ?? "",
+
+    description: {
+      en: project.description?.en ?? "",
+      fa: project.description?.fa ?? "",
+    },
+
+    image: project.image ? urlFor(project.image).width(1200).url() : "",
+
+    technologies: project.technologies ?? [],
+
+    github: project.github,
+
+    demo: project.demo,
+
+    featured: project.featured ?? false,
+
+    content: {
+      overview: {
+        en: project.content?.overview?.en ?? "",
+        fa: project.content?.overview?.fa ?? "",
+      },
+
+      challenges: {
+        en: project.content?.challenges?.en ?? "",
+        fa: project.content?.challenges?.fa ?? "",
+      },
+
+      outcome: {
+        en: project.content?.outcome?.en ?? "",
+        fa: project.content?.outcome?.fa ?? "",
+      },
+    },
   };
 }

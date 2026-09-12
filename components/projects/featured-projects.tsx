@@ -1,12 +1,34 @@
 import { getTranslations } from "next-intl/server";
 
 import ProjectCard from "@/components/projects/project-card";
-import { projects } from "@/lib/data/projects";
+import { client } from "@/lib/sanity/client";
+import { mapSanityProject } from "@/lib/sanity/mappers";
+
+const featuredProjectsQuery = `*[
+  _type == "project" &&
+  featured == true
+] | order(_createdAt desc) {
+  _id,
+  title,
+  slug,
+  description,
+  image,
+  technologies,
+  github,
+  demo,
+  featured,
+  content
+}`;
+
+export const dynamic = "force-dynamic";
 
 export default async function FeaturedProjects() {
   const t = await getTranslations("projects");
 
-  const featuredProjects = projects.filter((project) => project.featured);
+  const sanityProjects: Parameters<typeof mapSanityProject>[0][] =
+    await client.fetch(featuredProjectsQuery);
+
+  const featuredProjects = sanityProjects.map(mapSanityProject);
 
   return (
     <section className="py-20">

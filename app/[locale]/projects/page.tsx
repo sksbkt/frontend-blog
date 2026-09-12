@@ -1,10 +1,19 @@
-import ProjectCard from "@/components/projects/project-card";
 import { getTranslations } from "next-intl/server";
 
-import { projects } from "@/lib/data/projects";
+import ProjectCard from "@/components/projects/project-card";
+import { client } from "@/lib/sanity/client";
+import { mapSanityProject } from "@/lib/sanity/mappers";
+import { projectsQuery } from "@/lib/sanity/queries";
+
+export const dynamic = "force-dynamic";
 
 export default async function ProjectsPage() {
   const t = await getTranslations("projects");
+
+  const sanityProjects: Parameters<typeof mapSanityProject>[0][] =
+    await client.fetch(projectsQuery);
+
+  const projects = sanityProjects.map(mapSanityProject);
 
   return (
     <main className="py-20">
