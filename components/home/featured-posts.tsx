@@ -1,10 +1,34 @@
-import ArticleCard from "@/components/blog/article-card";
-import { posts } from "@/lib/data/posts";
 import { getTranslations } from "next-intl/server";
+
+import ArticleCard from "@/components/blog/article-card";
+import { client } from "@/lib/sanity/client";
+import { mapSanityPost } from "@/lib/sanity/mappers";
+
+const featuredPostsQuery = `*[
+  _type == "post" &&
+  featured == true
+] | order(publishedAt desc) {
+  _id,
+  title,
+  slug,
+  excerpt,
+  coverImage,
+  publishedAt,
+  readingTime,
+  tags,
+  featured,
+  body
+}`;
+
+export const dynamic = "force-dynamic";
 
 export default async function FeaturedPosts() {
   const t = await getTranslations("blog");
-  const featuredPosts = posts.filter((post) => post.featured);
+
+  const sanityPosts: Parameters<typeof mapSanityPost>[0][] =
+    await client.fetch(featuredPostsQuery);
+
+  const featuredPosts = sanityPosts.map(mapSanityPost);
 
   return (
     <section className="py-16">
