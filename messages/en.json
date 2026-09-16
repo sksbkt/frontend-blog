@@ -26,7 +26,10 @@
             "challenges": "Challenges",
             "outcome": "Outcome",
             "back": "Back to Projects",
-            "notFound": "Project Not Found"
+            "notFound": "Project Not Found",
+            "previous": "Previous",
+            "next": "Next",
+            "page": "Page"
         },
         "featured": {
             "label": "Projects",
@@ -46,7 +49,10 @@
         },
         "page": {
             "back": "Back to Blog",
-            "notFound": "Article Not Found"
+            "notFound": "Article Not Found",
+            "previous": "Previous",
+            "next": "Next",
+            "page": "Page"
         }
     },
     "about": {

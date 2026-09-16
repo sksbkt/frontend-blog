@@ -1,7 +1,7 @@
+import type { Metadata } from "next";
 import { ArrowLeft } from "lucide-react";
 import Image from "next/image";
 import { notFound } from "next/navigation";
-import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 
 import { Link } from "@/i18n/navigation";
@@ -69,9 +69,37 @@ export async function generateMetadata({
 
   const language = locale === "fa" ? "fa" : "en";
 
+  const title = post.title[language];
+  const description = post.excerpt[language];
+
   return {
-    title: post.title[language],
-    description: post.excerpt[language],
+    title,
+    description,
+    keywords: post.tags,
+
+    openGraph: {
+      type: "article",
+      title,
+      description,
+      publishedTime: post.publishedAt,
+      tags: post.tags,
+      locale: language === "fa" ? "fa_IR" : "en_US",
+      images: post.image
+        ? [
+            {
+              url: post.image,
+              alt: title,
+            },
+          ]
+        : undefined,
+    },
+
+    twitter: {
+      card: post.image ? "summary_large_image" : "summary",
+      title,
+      description,
+      images: post.image ? [post.image] : undefined,
+    },
   };
 }
 

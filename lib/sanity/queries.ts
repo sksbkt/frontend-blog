@@ -1,4 +1,6 @@
-export const postsQuery = `*[_type == "post"] | order(publishedAt desc) {
+export const postsQuery = `*[
+  _type == "post"
+] | order(publishedAt desc) [$start...$end] {
   _id,
   title,
   slug,
@@ -11,7 +13,9 @@ export const postsQuery = `*[_type == "post"] | order(publishedAt desc) {
   body
 }`;
 
-export const projectsQuery = `*[_type == "project"] | order(_createdAt desc) {
+export const projectsQuery = `*[
+  _type == "project"
+] | order(_createdAt desc) {
   _id,
   title,
   slug,

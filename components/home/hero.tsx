@@ -1,11 +1,12 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ArrowRight, Code2, Sparkles } from "lucide-react";
+import { ArrowRight, Sparkles } from "lucide-react";
 import { useTranslations } from "next-intl";
 
-import { Link } from "@/i18n/navigation";
+import CodeWindow from "@/components/home/code-window";
 import { Button } from "@/components/ui/button";
+import { Link } from "@/i18n/navigation";
 
 const fadeUp = {
   hidden: {
@@ -16,6 +17,26 @@ const fadeUp = {
     opacity: 1,
     y: 0,
   },
+};
+
+const developer = {
+  name: "Developer",
+
+  stack: ["Next.js", "TypeScript", "React", "Tailwind CSS", "Sanity"],
+
+  focus: [
+    "Clean interfaces",
+    "Responsive design",
+    "Accessible UX",
+    "Performance",
+  ],
+
+  building: [
+    "Modern web apps",
+    "Content-driven websites",
+    "Useful digital products",
+    "Scalable experiences",
+  ],
 };
 
 export default function Hero() {
@@ -51,7 +72,10 @@ export default function Hero() {
         >
           <motion.div
             variants={fadeUp}
-            transition={{ duration: 0.6, ease: "easeOut" }}
+            transition={{
+              duration: 0.6,
+              ease: "easeOut",
+            }}
             className="inline-flex items-center gap-2 rounded-full border bg-background/80 px-4 py-2 text-sm font-medium text-muted-foreground shadow-sm backdrop-blur"
           >
             <Sparkles className="size-4 text-primary" />
@@ -62,7 +86,10 @@ export default function Hero() {
           <div className="space-y-6">
             <motion.h1
               variants={fadeUp}
-              transition={{ duration: 0.7, ease: "easeOut" }}
+              transition={{
+                duration: 0.7,
+                ease: "easeOut",
+              }}
               className="max-w-3xl text-5xl font-bold tracking-tight sm:text-6xl lg:text-7xl"
             >
               {t("title")}
@@ -70,7 +97,10 @@ export default function Hero() {
 
             <motion.p
               variants={fadeUp}
-              transition={{ duration: 0.7, ease: "easeOut" }}
+              transition={{
+                duration: 0.7,
+                ease: "easeOut",
+              }}
               className="max-w-2xl text-lg leading-8 text-muted-foreground md:text-xl"
             >
               {t("description")}
@@ -79,7 +109,10 @@ export default function Hero() {
 
           <motion.div
             variants={fadeUp}
-            transition={{ duration: 0.7, ease: "easeOut" }}
+            transition={{
+              duration: 0.7,
+              ease: "easeOut",
+            }}
             className="flex flex-wrap gap-4"
           >
             <Link href="/projects">
@@ -129,92 +162,10 @@ export default function Hero() {
             }}
           />
 
-          <motion.div
-            dir="ltr"
-            whileHover={{
-              y: -4,
-              scale: 1.01,
-            }}
-            transition={{
-              duration: 0.25,
-              ease: "easeOut",
-            }}
-            className="relative overflow-hidden rounded-2xl border bg-card/90 text-left shadow-2xl backdrop-blur"
-          >
-            <div className="flex items-center gap-2 border-b px-5 py-4">
-              <span className="size-3 rounded-full bg-muted-foreground/30" />
-              <span className="size-3 rounded-full bg-muted-foreground/30" />
-              <span className="size-3 rounded-full bg-muted-foreground/30" />
-
-              <div className="ms-3 flex items-center gap-2 text-sm text-muted-foreground">
-                <Code2 className="size-4" />
-                <span>developer.tsx</span>
-              </div>
-            </div>
-
-            <div className="p-6 font-mono text-sm leading-8">
-              <div>
-                <span className="text-muted-foreground">01</span>
-                <span className="ms-5 text-purple-500">const</span>{" "}
-                <span className="text-primary">developer</span>{" "}
-                <span className="text-muted-foreground">=</span>{" "}
-                <span>{"{"}</span>
-              </div>
-
-              <div>
-                <span className="text-muted-foreground">02</span>
-                <span className="ms-5 text-sky-500">name</span>
-                <span className="text-muted-foreground">:</span>{" "}
-                <span className="text-green-500">&quot;Developer&quot;</span>
-                <span className="text-muted-foreground">,</span>
-              </div>
-
-              <div>
-                <span className="text-muted-foreground">03</span>
-                <span className="ms-5 text-sky-500">stack</span>
-                <span className="text-muted-foreground">:</span>{" "}
-                <span className="text-green-500">
-                  &quot;Next.js + TypeScript&quot;
-                </span>
-                <span className="text-muted-foreground">,</span>
-              </div>
-
-              <div>
-                <span className="text-muted-foreground">04</span>
-                <span className="ms-5 text-sky-500">focus</span>
-                <span className="text-muted-foreground">:</span>{" "}
-                <span className="text-green-500">
-                  &quot;Clean interfaces&quot;
-                </span>
-                <span className="text-muted-foreground">,</span>
-              </div>
-
-              <div>
-                <span className="text-muted-foreground">05</span>
-                <span className="ms-5 text-sky-500">building</span>
-                <span className="text-muted-foreground">:</span>{" "}
-                <span className="text-green-500">
-                  &quot;Useful things&quot;
-                </span>
-                <span className="text-muted-foreground">,</span>
-              </div>
-
-              <div>
-                <span className="text-muted-foreground">06</span>
-                <span className="ms-5">{"}"}</span>
-                <span className="text-muted-foreground">;</span>
-              </div>
-
-              <div className="mt-6 border-t pt-5 text-muted-foreground">
-                <span className="text-muted-foreground">07</span>
-                <span className="ms-5 text-purple-500">
-                  export default
-                </span>{" "}
-                <span className="text-primary">developer</span>
-                <span className="text-muted-foreground">;</span>
-              </div>
-            </div>
-          </motion.div>
+          <CodeWindow
+            title="developer.tsx"
+            data={developer}
+          />
         </motion.div>
       </div>
     </section>

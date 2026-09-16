@@ -1,19 +1,44 @@
 import { getTranslations } from "next-intl/server";
 
 import ProjectCard from "@/components/projects/project-card";
+import Pagination from "@/components/shared/pagination";
 import { client } from "@/lib/sanity/client";
 import { mapSanityProject } from "@/lib/sanity/mappers";
 import { projectsQuery } from "@/lib/sanity/queries";
 
+const PROJECTS_PER_PAGE = 6;
+
+type ProjectsPageProps = {
+  searchParams: Promise<{
+    page?: string;
+  }>;
+};
+
 export const dynamic = "force-dynamic";
 
-export default async function ProjectsPage() {
+export default async function ProjectsPage({
+  searchParams,
+}: ProjectsPageProps) {
   const t = await getTranslations("projects");
 
-  const sanityProjects: Parameters<typeof mapSanityProject>[0][] =
-    await client.fetch(projectsQuery);
+  const { page: pageParam } = await searchParams;
 
-  const projects = sanityProjects.map(mapSanityProject);
+  const page = Math.max(1, Number.parseInt(pageParam ?? "1", 10) || 1);
+
+  const start = (page - 1) * PROJECTS_PER_PAGE;
+  const end = start + PROJECTS_PER_PAGE + 1;
+
+  const sanityProjects: Parameters<typeof mapSanityProject>[0][] =
+    await client.fetch(projectsQuery, {
+      start,
+      end,
+    });
+
+  const hasNextPage = sanityProjects.length > PROJECTS_PER_PAGE;
+
+  const projects = sanityProjects
+    .slice(0, PROJECTS_PER_PAGE)
+    .map(mapSanityProject);
 
   return (
     <main className="py-20">
@@ -40,6 +65,13 @@ export default async function ProjectsPage() {
             />
           ))}
         </div>
+
+        <Pagination
+          currentPage={page}
+          hasNextPage={hasNextPage}
+          basePath="/projects"
+          translationNamespace="projects.page"
+        />
       </div>
     </main>
   );

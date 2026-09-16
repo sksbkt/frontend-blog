@@ -1,19 +1,40 @@
 import { getTranslations } from "next-intl/server";
 
 import ArticleCard from "@/components/blog/article-card";
+import Pagination from "@/components/shared/pagination";
 import { client } from "@/lib/sanity/client";
 import { mapSanityPost } from "@/lib/sanity/mappers";
 import { postsQuery } from "@/lib/sanity/queries";
 
-// export const dynamic = "force-dynamic";
+const POSTS_PER_PAGE = 6;
 
-export default async function BlogPage() {
+type BlogPageProps = {
+  searchParams: Promise<{
+    page?: string;
+  }>;
+};
+
+export default async function BlogPage({ searchParams }: BlogPageProps) {
   const t = await getTranslations("blog");
 
-  const sanityPosts: Parameters<typeof mapSanityPost>[0][] =
-    await client.fetch(postsQuery);
+  const { page: pageParam } = await searchParams;
 
-  const posts = sanityPosts.map(mapSanityPost);
+  const page = Math.max(1, Number.parseInt(pageParam ?? "1", 10) || 1);
+
+  const start = (page - 1) * POSTS_PER_PAGE;
+  const end = start + POSTS_PER_PAGE + 1;
+
+  const sanityPosts: Parameters<typeof mapSanityPost>[0][] = await client.fetch(
+    postsQuery,
+    {
+      start,
+      end,
+    },
+  );
+
+  const hasNextPage = sanityPosts.length > POSTS_PER_PAGE;
+
+  const posts = sanityPosts.slice(0, POSTS_PER_PAGE).map(mapSanityPost);
 
   return (
     <main className="py-20">
@@ -40,6 +61,12 @@ export default async function BlogPage() {
             />
           ))}
         </div>
+        <Pagination
+          currentPage={page}
+          hasNextPage={hasNextPage}
+          basePath="/blog"
+          translationNamespace="blog.page"
+        />
       </div>
     </main>
   );
