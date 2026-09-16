@@ -10,6 +10,11 @@ type GitHubRepository = {
   topics: string[];
 };
 
+type GitHubFile = {
+  content: string;
+  encoding: string;
+};
+
 function parseGitHubUrl(value: string) {
   try {
     const url = new URL(value);
@@ -49,6 +54,26 @@ async function githubFetch<T>(url: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+async function githubFetchOptional<T>(url: string): Promise<T | null> {
+  const response = await fetch(url, {
+    headers: {
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+    },
+    cache: "no-store",
+  });
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new Error(`GitHub request failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<T>;
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -77,15 +102,31 @@ export async function POST(request: Request) {
 
     const apiBase = `https://api.github.com/repos/${repository.owner}/${repository.repo}`;
 
-    const [repoData, readmeData] = await Promise.all([
+    const [repoData, readmeData, packageJsonData] = await Promise.all([
       githubFetch<GitHubRepository>(apiBase),
-      githubFetch<{ content: string; encoding: string }>(`${apiBase}/readme`),
+      githubFetch<GitHubFile>(`${apiBase}/readme`),
+      githubFetchOptional<GitHubFile>(`${apiBase}/contents/package.json`),
     ]);
 
     const readme = Buffer.from(
       readmeData.content,
       readmeData.encoding as BufferEncoding,
     ).toString("utf-8");
+
+    let packageJson: Record<string, unknown> | null = null;
+
+    if (packageJsonData) {
+      const packageJsonContent = Buffer.from(
+        packageJsonData.content,
+        packageJsonData.encoding as BufferEncoding,
+      ).toString("utf-8");
+
+      try {
+        packageJson = JSON.parse(packageJsonContent);
+      } catch {
+        packageJson = null;
+      }
+    }
 
     return NextResponse.json({
       success: true,
@@ -99,6 +140,7 @@ export async function POST(request: Request) {
         topics: repoData.topics,
       },
       readme,
+      packageJson,
     });
   } catch (error) {
     console.error("GitHub repository error:", error);

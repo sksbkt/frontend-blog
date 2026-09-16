@@ -13,6 +13,7 @@ type ProjectAiInput = {
     topics: string[];
   };
   readme: string;
+  packageJson: Record<string, unknown> | null;
 };
 
 type ProjectAiOutput = {
@@ -98,7 +99,7 @@ Return ONLY valid JSON with exactly these fields:
       "fa": "Natural Persian overview"
     },
     "challenges": {
-      "en": "Professional English description of the main technical challenges",
+      "en": "Professional English description of the main technical challenges"
       "fa": "Natural Persian description of the main technical challenges"
     },
     "outcome": {
@@ -110,7 +111,12 @@ Return ONLY valid JSON with exactly these fields:
 
 Rules:
 - Base everything on the provided repository information.
-- Do not invent technologies or project details that are not reasonably supported by the repository.
+- Treat the README, repository metadata, and package.json as the primary sources of evidence.
+- Do not invent technologies or project details that are not reasonably supported by the provided data.
+- For technologies, inspect package.json dependencies and devDependencies carefully.
+- Include important frameworks, libraries, build tools, styling technologies, and other meaningful technologies that are actually supported by package.json or the README.
+- Do not list every development utility as a portfolio technology unless it is relevant to the project.
+- Do not claim that a library was used just because it appears as a transitive dependency or unrelated tooling dependency.
 - Keep the main description concise and suitable for a developer portfolio.
 - The overview should explain what the project is and what it does.
 - The challenges should describe realistic technical challenges supported by the repository information.
@@ -119,9 +125,11 @@ Rules:
 - The Persian translation must be natural Persian, not word-for-word translation.
 - Use established Persian spellings for technology names when appropriate.
   For example, React should be written as "ری‌اکت", not "رکت".
+- Do not mix unrelated languages or scripts into Persian text.
 - Use a simple lowercase slug with hyphens.
 - Use the repository URL for "github".
 - Use the repository homepage for "demo" when it is clearly a real live/demo website.
+- If the README clearly contains a live demo URL, that URL may be used as "demo".
 - If there is no clear live demo, return an empty string for "demo".
 - Do not use markdown.
 - Do not include explanations outside the JSON.
@@ -132,6 +140,7 @@ Rules:
               content: JSON.stringify({
                 repository: body.repository,
                 readme: body.readme.slice(0, 20000),
+                packageJson: body.packageJson,
               }),
             },
           ],
