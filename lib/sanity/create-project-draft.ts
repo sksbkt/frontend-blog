@@ -19,6 +19,54 @@ type ProjectDraftInput = {
   };
 };
 
+const technologyAliases: Record<string, string> = {
+  "react.js": "React",
+  reactjs: "React",
+  react: "React",
+
+  "react-dom": "React DOM",
+
+  "next.js": "Next.js",
+  nextjs: "Next.js",
+  next: "Next.js",
+
+  typescript: "TypeScript",
+  javascript: "JavaScript",
+
+  css3: "CSS",
+  css: "CSS",
+  "pure css": "CSS",
+
+  html5: "HTML",
+  html: "HTML",
+
+  "tailwind css": "Tailwind CSS",
+  tailwindcss: "Tailwind CSS",
+  tailwind: "Tailwind CSS",
+
+  "node.js": "Node.js",
+  nodejs: "Node.js",
+  node: "Node.js",
+
+  express: "Express",
+  "express.js": "Express",
+
+  "three.js": "Three.js",
+  threejs: "Three.js",
+
+  vite: "Vite",
+
+  "create react app": "Create React App",
+
+  gsap: "GSAP",
+
+  netlify: "Netlify",
+
+  vercel: "Vercel",
+
+  sanity: "Sanity",
+};
+
 function normalizeSlug(value: string) {
   return value
     .trim()
@@ -28,11 +76,28 @@ function normalizeSlug(value: string) {
 }
 
 function normalizeTechnologies(technologies: string[]) {
-  return [
-    ...new Set(
-      technologies.map((technology) => technology.trim()).filter(Boolean),
-    ),
-  ];
+  const normalized = technologies
+    .map((technology) => technology.trim())
+    .filter(Boolean)
+    .map((technology) => {
+      const normalizedKey = technology.toLowerCase();
+
+      return technologyAliases[normalizedKey] ?? technology;
+    });
+
+  return [...new Set(normalized)];
+}
+
+function validateUrl(value: string, fieldName: string) {
+  try {
+    const url = new URL(value);
+
+    if (!["http:", "https:"].includes(url.protocol)) {
+      throw new Error();
+    }
+  } catch {
+    throw new Error(`${fieldName} must be a valid URL.`);
+  }
 }
 
 function validateProject(project: ProjectDraftInput) {
@@ -46,6 +111,12 @@ function validateProject(project: ProjectDraftInput) {
 
   if (!project.github.trim()) {
     throw new Error("GitHub URL is required.");
+  }
+
+  validateUrl(project.github, "GitHub URL");
+
+  if (project.demo.trim()) {
+    validateUrl(project.demo, "Demo URL");
   }
 
   if (project.technologies.length === 0) {
