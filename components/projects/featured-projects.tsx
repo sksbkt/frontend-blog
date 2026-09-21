@@ -57,6 +57,7 @@ export default async function FeaturedProjects() {
             <ProjectCard
               key={project.id}
               project={project}
+              activeTechnologies={[]}
             />
           ))}
         </FeaturedProjectsMotion>

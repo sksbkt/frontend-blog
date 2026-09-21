@@ -14,8 +14,12 @@ export const postsQuery = `*[
 }`;
 
 export const projectsQuery = `*[
-  _type == "project"
-] | order(_createdAt desc) {
+  _type == "project" &&
+  (
+    count($technologies) == 0 ||
+    count(technologies[@ in $technologies]) > 0
+  )
+] | order(_createdAt desc) [$start...$end] {
   _id,
   title,
   slug,
@@ -26,4 +30,17 @@ export const projectsQuery = `*[
   demo,
   featured,
   content
+}`;
+
+export const projectFilterTechnologiesQuery = `{
+  "allTechnologies": array::unique(
+    *[_type == "project"].technologies[@ != "" && defined(@)]
+  ),
+  "matchingTechnologies": *[
+    _type == "project" &&
+    (
+      count($technologies) == 0 ||
+      count(technologies[@ in $technologies]) > 0
+    )
+  ].technologies[@ != "" && defined(@)]
 }`;

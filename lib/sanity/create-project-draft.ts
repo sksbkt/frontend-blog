@@ -1,4 +1,5 @@
 import { writeClient } from "@/lib/sanity/write-client";
+import { resolveTechnologies } from "@/lib/sanity/technology-registry";
 
 type LocalizedText = {
   en: string;
@@ -19,73 +20,12 @@ type ProjectDraftInput = {
   };
 };
 
-const technologyAliases: Record<string, string> = {
-  "react.js": "React",
-  reactjs: "React",
-  react: "React",
-
-  "react-dom": "React DOM",
-
-  "next.js": "Next.js",
-  nextjs: "Next.js",
-  next: "Next.js",
-
-  typescript: "TypeScript",
-  javascript: "JavaScript",
-
-  css3: "CSS",
-  css: "CSS",
-  "pure css": "CSS",
-
-  html5: "HTML",
-  html: "HTML",
-
-  "tailwind css": "Tailwind CSS",
-  tailwindcss: "Tailwind CSS",
-  tailwind: "Tailwind CSS",
-
-  "node.js": "Node.js",
-  nodejs: "Node.js",
-  node: "Node.js",
-
-  express: "Express",
-  "express.js": "Express",
-
-  "three.js": "Three.js",
-  threejs: "Three.js",
-
-  vite: "Vite",
-
-  "create react app": "Create React App",
-
-  gsap: "GSAP",
-
-  netlify: "Netlify",
-
-  vercel: "Vercel",
-
-  sanity: "Sanity",
-};
-
 function normalizeSlug(value: string) {
   return value
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
-}
-
-function normalizeTechnologies(technologies: string[]) {
-  const normalized = technologies
-    .map((technology) => technology.trim())
-    .filter(Boolean)
-    .map((technology) => {
-      const normalizedKey = technology.toLowerCase();
-
-      return technologyAliases[normalizedKey] ?? technology;
-    });
-
-  return [...new Set(normalized)];
 }
 
 function validateUrl(value: string, fieldName: string) {
@@ -195,10 +135,12 @@ async function uploadProjectImage(githubUrl: string, title: string) {
 }
 
 export async function createProjectDraft(project: ProjectDraftInput) {
+  const technologies = await resolveTechnologies(project.technologies);
+
   const normalizedProject = {
     ...project,
     slug: normalizeSlug(project.slug),
-    technologies: normalizeTechnologies(project.technologies),
+    technologies,
   };
 
   validateProject(normalizedProject);

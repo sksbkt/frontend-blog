@@ -7,9 +7,13 @@ import type { Project } from "@/types/project";
 
 type ProjectCardProps = {
   project: Project;
+  activeTechnologies: string[];
 };
 
-export default async function ProjectCard({ project }: ProjectCardProps) {
+export default async function ProjectCard({
+  project,
+  activeTechnologies,
+}: ProjectCardProps) {
   const locale = await getLocale();
   const t = await getTranslations("projects.card");
 
@@ -35,7 +39,7 @@ export default async function ProjectCard({ project }: ProjectCardProps) {
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-card via-card/60 to-transparent" />
         </div>
 
-        <div className="-mt-8 relative z-10 p-6">
+        <div className="-mt-8 relative z-10 p-6 pb-2">
           <h3 className="text-xl font-semibold transition-colors group-hover:text-primary">
             {project.title[language]}
           </h3>
@@ -43,21 +47,44 @@ export default async function ProjectCard({ project }: ProjectCardProps) {
           <p className="mt-3 leading-7 text-muted-foreground">
             {project.description[language]}
           </p>
-
-          <div className="mt-5 flex flex-wrap gap-2">
-            {project.technologies.map((technology) => (
-              <span
-                key={technology}
-                className="rounded-full bg-muted px-3 py-1 text-xs"
-              >
-                {technology}
-              </span>
-            ))}
-          </div>
         </div>
       </Link>
 
-      <div className="relative z-10 flex gap-3 px-6 pb-6">
+      <div className="relative z-10 px-6 pb-2">
+        <div className="flex flex-wrap gap-2">
+          {project.technologies.map((technology) => {
+            const isActive = activeTechnologies.includes(technology);
+
+            const nextTechnologies = isActive
+              ? activeTechnologies.filter((item) => item !== technology)
+              : [...activeTechnologies, technology];
+
+            return (
+              <Link
+                key={technology}
+                href={{
+                  pathname: "/projects",
+                  query:
+                    nextTechnologies.length > 0
+                      ? {
+                          tech: nextTechnologies,
+                        }
+                      : {},
+                }}
+                className={`rounded-full px-3 py-1 text-xs transition-colors ${
+                  isActive
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted hover:bg-primary hover:text-primary-foreground"
+                }`}
+              >
+                {technology}
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="relative z-10 flex gap-3 px-6 pb-6 pt-4">
         {project.demo && (
           <a
             href={project.demo}
