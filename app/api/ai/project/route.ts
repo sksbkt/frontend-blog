@@ -13,11 +13,16 @@ type ProjectContent = {
   outcome: LocalizedText;
 };
 
+type TechnologyOutput = {
+  name: string;
+  description: string;
+};
+
 type ProjectOutput = {
   title: LocalizedText;
   slug: string;
   description: LocalizedText;
-  technologies: string[];
+  technologies: TechnologyOutput[];
   github: string;
   demo: string;
   content: ProjectContent;
@@ -201,6 +206,27 @@ function cleanPersianText(text: string) {
 }
 
 function cleanProjectOutput(project: ProjectOutput): ProjectOutput {
+  const uniqueTechnologies = new Map<string, TechnologyOutput>();
+
+  for (const technology of project.technologies) {
+    const name = normalizeTechnologyNames(technology.name.trim());
+
+    const description = cleanEnglishText(technology.description);
+
+    if (!name) {
+      continue;
+    }
+
+    const key = name.toLowerCase();
+
+    if (!uniqueTechnologies.has(key)) {
+      uniqueTechnologies.set(key, {
+        name,
+        description,
+      });
+    }
+  }
+
   return {
     title: {
       en: cleanEnglishText(project.title.en),
@@ -214,13 +240,7 @@ function cleanProjectOutput(project: ProjectOutput): ProjectOutput {
       fa: cleanPersianText(project.description.fa),
     },
 
-    technologies: [
-      ...new Set(
-        project.technologies
-          .map((technology) => normalizeTechnologyNames(technology.trim()))
-          .filter(Boolean),
-      ),
-    ],
+    technologies: [...uniqueTechnologies.values()],
 
     github: project.github.trim(),
     demo: project.demo.trim(),
@@ -274,7 +294,6 @@ function removeApprovedLatinTerms(text: string) {
 
 function containsBrokenMixedWord(text: string) {
   const withoutUrls = removeUrls(text);
-
   const withoutApprovedTerms = removeApprovedLatinTerms(withoutUrls);
 
   return /[\u0600-\u06ff][A-Za-z]|[A-Za-z][\u0600-\u06ff]/.test(
@@ -282,10 +301,14 @@ function containsBrokenMixedWord(text: string) {
   );
 }
 
-function containsUnapprovedLatinSequence(text: string) {
+function getLatinSequences(text: string) {
   const withoutUrls = removeUrls(text);
 
-  const latinSequences = withoutUrls.match(/[A-Za-z][A-Za-z0-9.+#-]*/g) ?? [];
+  return withoutUrls.match(/[A-Za-z][A-Za-z0-9.+#-]*/g) ?? [];
+}
+
+function containsUnapprovedLatinSequence(text: string) {
+  const latinSequences = getLatinSequences(text);
 
   return latinSequences.some(
     (sequence) => !allowedPersianLatinTerms.has(sequence),
@@ -293,9 +316,7 @@ function containsUnapprovedLatinSequence(text: string) {
 }
 
 function getUnexpectedLatinTerm(text: string) {
-  const withoutUrls = removeUrls(text);
-
-  const latinSequences = withoutUrls.match(/[A-Za-z][A-Za-z0-9.+#-]*/g) ?? [];
+  const latinSequences = getLatinSequences(text);
 
   return (
     latinSequences.find(
@@ -378,8 +399,14 @@ function validateProjectOutput(project: ProjectOutput) {
   }
 
   for (const technology of project.technologies) {
-    if (!technology.trim()) {
+    if (!technology.name.trim()) {
       throw new Error("Technology names cannot be empty.");
+    }
+
+    if (!technology.description.trim()) {
+      throw new Error(
+        `Technology description is required for "${technology.name}".`,
+      );
     }
   }
 }
@@ -431,7 +458,15 @@ function parseAiJson(content: string): ProjectOutput {
 
   if (
     !Array.isArray(project.technologies) ||
-    !project.technologies.every((technology) => typeof technology === "string")
+    !project.technologies.every(
+      (technology) =>
+        technology &&
+        typeof technology === "object" &&
+        "name" in technology &&
+        "description" in technology &&
+        typeof technology.name === "string" &&
+        typeof technology.description === "string",
+    )
   ) {
     throw new Error("AI response contains invalid technologies.");
   }
@@ -481,7 +516,7 @@ function parseAiJson(content: string): ProjectOutput {
       fa: description.fa,
     },
 
-    technologies: project.technologies as string[],
+    technologies: project.technologies as TechnologyOutput[],
 
     github: project.github,
     demo: project.demo,
@@ -563,7 +598,12 @@ Your output MUST be valid JSON with exactly this structure:
     "en": "string",
     "fa": "string"
   },
-  "technologies": ["string"],
+  "technologies": [
+    {
+      "name": "string",
+      "description": "string"
+    }
+  ],
   "github": "string",
   "demo": "string",
   "content": {
@@ -632,18 +672,6 @@ stunning
 impressive
 outstanding
 
-If a sentence sounds like marketing copy,
-rewrite it as a factual description.
-
-BAD:
-
-"This project is a powerful and professional Apple clone."
-
-GOOD:
-
-"This project is an Apple website clone implemented with React,
-CSS3, SVG, and JavaScript."
-
 LANGUAGE RULES:
 
 - English fields must be natural English.
@@ -651,41 +679,6 @@ LANGUAGE RULES:
 - Persian prose should remain Persian.
 - Technology names must remain in canonical English form.
 - NEVER translate or transliterate technology names into Persian.
-
-Canonical technology names include:
-
-React
-React DOM
-Next.js
-TypeScript
-JavaScript
-CSS
-CSS3
-HTML
-HTML5
-Tailwind CSS
-Node.js
-Express
-Three.js
-Vite
-Create React App
-GSAP
-Netlify
-Vercel
-Sanity
-GitHub
-SVG
-WebGL
-Sentry
-Redux
-Zustand
-Firebase
-MongoDB
-PostgreSQL
-MySQL
-Prisma
-Supabase
-Framer Motion
 
 Correct Persian:
 
@@ -703,6 +696,24 @@ TECHNOLOGIES:
 - Prefer package.json dependencies and explicit source/project-structure evidence.
 - Do not include a technology merely because it is mentioned casually.
 - Do not duplicate technologies.
+
+For EVERY technology, also provide a short factual English
+description explaining what the technology is.
+
+Example:
+
+{
+  "name": "React",
+  "description": "A JavaScript library for building user interfaces."
+}
+
+The technology description must:
+
+- be factual and neutral
+- be concise
+- describe the technology itself
+- not describe how impressive the project is
+- not claim that the project uses a feature unless repository evidence supports it
 
 DESCRIPTION:
 
@@ -764,10 +775,9 @@ Before returning JSON:
 4. Verify approved technical terms may appear naturally in Persian.
 5. Verify technology names remain canonical English.
 6. Verify technologies are supported by evidence.
-7. Verify the JSON structure is exactly correct.
-8. Return JSON only.
-
-Do not wrap the JSON in markdown fences.
+7. Verify every technology has a factual English description.
+8. Verify the JSON structure is exactly correct.
+9. Return JSON only.
 `.trim();
 
 async function requestOpenRouter(
@@ -816,7 +826,9 @@ async function requestOpenRouter(
 
   if (!response.ok) {
     throw new Error(
-      `OpenRouter request failed with status ${response.status}: ${JSON.stringify(data)}`,
+      `OpenRouter request failed with status ${response.status}: ${JSON.stringify(
+        data,
+      )}`,
     );
   }
 
@@ -845,16 +857,9 @@ export async function POST(request: Request) {
     }
 
     const repository = body.repository;
-
     const readme = body.readme;
-
     const packageJson = body.packageJson ?? null;
 
-    /*
-     * First attempt:
-     *
-     * Use OpenRouter's free router.
-     */
     let aiContent: string;
 
     try {
@@ -882,12 +887,6 @@ export async function POST(request: Request) {
       );
     }
 
-    /*
-     * The free router can route to different models.
-     *
-     * If a provider returns a safety/status string
-     * instead of JSON, try one more free model.
-     */
     if (isNonJsonSafetyResponse(aiContent)) {
       console.warn(
         "OpenRouter free router returned a non-JSON safety response. Retrying with a structured-output free model.",
@@ -921,10 +920,6 @@ export async function POST(request: Request) {
       }
     }
 
-    /*
-     * If the fallback also returns a safety/status
-     * message, do not send it to JSON.parse().
-     */
     if (isNonJsonSafetyResponse(aiContent)) {
       console.error(
         "OpenRouter returned a non-JSON safety response:",
@@ -990,14 +985,6 @@ export async function POST(request: Request) {
       );
     }
 
-    /*
-     * Only create the Sanity draft after:
-     *
-     * 1. OpenRouter succeeds
-     * 2. Response is JSON
-     * 3. JSON structure is valid
-     * 4. Content passes validation
-     */
     const draft = await createProjectDraft(cleanedProject);
 
     return NextResponse.json({

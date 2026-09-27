@@ -6,11 +6,16 @@ type LocalizedText = {
   fa: string;
 };
 
+type TechnologyInput = {
+  name: string;
+  description: string;
+};
+
 type ProjectDraftInput = {
   title: LocalizedText;
   slug: string;
   description: LocalizedText;
-  technologies: string[];
+  technologies: TechnologyInput[];
   github: string;
   demo: string;
   content: {
@@ -61,6 +66,18 @@ function validateProject(project: ProjectDraftInput) {
 
   if (project.technologies.length === 0) {
     throw new Error("At least one technology is required.");
+  }
+
+  for (const technology of project.technologies) {
+    if (!technology.name.trim()) {
+      throw new Error("Technology name cannot be empty.");
+    }
+
+    if (!technology.description.trim()) {
+      throw new Error(
+        `Technology description is required for "${technology.name}".`,
+      );
+    }
   }
 
   if (
@@ -143,7 +160,10 @@ export async function createProjectDraft(project: ProjectDraftInput) {
     technologies,
   };
 
-  validateProject(normalizedProject);
+  validateProject({
+    ...normalizedProject,
+    technologies: project.technologies,
+  });
 
   const draftId = `drafts.${crypto.randomUUID()}`;
 

@@ -1,5 +1,10 @@
 import { writeClient } from "@/lib/sanity/write-client";
 
+type TechnologyInput = {
+  name: string;
+  description: string;
+};
+
 type TechnologyDocument = {
   _id: string;
   name: string;
@@ -42,51 +47,63 @@ async function findTechnology(
 }
 
 async function createTechnology(
-  technology: string,
+  technology: TechnologyInput,
 ): Promise<TechnologyDocument> {
-  const normalizedTechnology = technology.trim();
-  const normalizedKey = normalizeTechnologyKey(normalizedTechnology);
+  const name = technology.name.trim();
+  const description = technology.description.trim();
 
-  const technologyId = createTechnologyId(normalizedTechnology);
+  const normalizedKey = normalizeTechnologyKey(name);
+  const technologyId = createTechnologyId(name);
 
   return writeClient.createIfNotExists({
     _id: technologyId,
     _type: "technology",
-    name: normalizedTechnology,
+    name,
     aliases: [normalizedKey],
-    description: "Technology used in a web development project.",
+    description,
   });
 }
 
-export async function resolveTechnology(technology: string): Promise<string> {
-  const normalizedTechnology = technology.trim();
+export async function resolveTechnology(
+  technology: TechnologyInput,
+): Promise<string> {
+  const name = technology.name.trim();
 
-  if (!normalizedTechnology) {
+  if (!name) {
     throw new Error("Technology name cannot be empty.");
   }
 
-  const existingTechnology = await findTechnology(normalizedTechnology);
+  const existingTechnology = await findTechnology(name);
 
   if (existingTechnology) {
     return existingTechnology.name;
   }
 
-  const createdTechnology = await createTechnology(normalizedTechnology);
+  const createdTechnology = await createTechnology({
+    name,
+    description: technology.description,
+  });
 
   return createdTechnology.name;
 }
 
 export async function resolveTechnologies(
-  technologies: string[],
+  technologies: TechnologyInput[],
 ): Promise<string[]> {
-  const uniqueTechnologies = [
-    ...new Set(
+  const uniqueTechnologies = Array.from(
+    new Map(
       technologies
-        .map((technology) => technology.trim())
-        .filter(Boolean)
-        .map(normalizeTechnologyKey),
-    ),
-  ];
+        .map((technology) => ({
+          name: technology.name.trim(),
+          description: technology.description.trim(),
+        }))
+        .filter((technology) => technology.name)
+        .map((technology) => [
+          normalizeTechnologyKey(technology.name),
+          technology,
+        ]),
+    ).values(),
+  );
 
   const resolvedTechnologies = await Promise.all(
     uniqueTechnologies.map(resolveTechnology),
