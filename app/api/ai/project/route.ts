@@ -88,6 +88,50 @@ const allowedPersianLatinTerms = new Set([
   "Prisma",
   "Supabase",
   "Framer Motion",
+  "Flexbox",
+  "Grid",
+  "CSS Grid",
+  "UI",
+  "UX",
+  "DOM",
+  "3D",
+  "SPA",
+  "PWA",
+  "SEO",
+  "Webpack",
+  "Babel",
+  "ESLint",
+  "Prettier",
+  "Jest",
+  "Git",
+  "npm",
+  "yarn",
+  "pnpm",
+  "will-change",
+  "transform",
+  "transition",
+  "animation",
+  "keyframes",
+  "sticky",
+  "fixed",
+  "relative",
+  "absolute",
+  "viewport",
+  "calc",
+  "clamp",
+  "rem",
+  "em",
+  "px",
+  "vh",
+  "vw",
+  "z-index",
+  "backdrop-filter",
+  "box-sizing",
+  "IntersectionObserver",
+  "ResizeObserver",
+  "requestAnimationFrame",
+  "localStorage",
+  "sessionStorage",
 ]);
 
 const canonicalTechnologyNames: Record<string, string> = {
@@ -191,6 +235,8 @@ function normalizeSlug(value: string) {
 
 function cleanEnglishText(text: string) {
   return text
+    .replace(/\bpixel-perfect\b/gi, "detailed")
+    .replace(/\bpixel perfect\b/gi, "detailed")
     .trim()
     .replace(/\s+/g, " ")
     .replace(/^[\s"'`]+|[\s"'`]+$/g, "");
@@ -198,6 +244,7 @@ function cleanEnglishText(text: string) {
 
 function cleanPersianText(text: string) {
   const cleaned = text
+    .replace(/پیکسل[- ]پرفکت/g, "دقیق")
     .trim()
     .replace(/\s+/g, " ")
     .replace(/^[\s"'`]+|[\s"'`]+$/g, "");
@@ -267,62 +314,132 @@ function cleanProjectOutput(project: ProjectOutput): ProjectOutput {
 function getForbiddenPromotionalPhrase(text: string) {
   const normalized = text.toLowerCase();
 
-  return (
-    forbiddenPromotionalPhrases.find((phrase) =>
-      normalized.includes(phrase.toLowerCase()),
-    ) ?? null
-  );
+  for (const phrase of forbiddenPromotionalPhrases) {
+    const lowerPhrase = phrase.toLowerCase();
+    if (/[\u0600-\u06ff]/.test(phrase)) {
+      if (normalized.includes(lowerPhrase)) {
+        return phrase;
+      }
+    } else {
+      const regex = new RegExp(
+        `\\b${lowerPhrase.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&")}\\b`,
+        "i",
+      );
+      if (regex.test(normalized)) {
+        return phrase;
+      }
+    }
+  }
+
+  return null;
 }
 
 function removeUrls(text: string) {
   return text.replace(/https?:\/\/[^\s]+/gi, "");
 }
 
-function removeApprovedLatinTerms(text: string) {
+function extractTechnicalTermsFromReadme(readmeText: string): string[] {
+  const terms = new Set<string>();
+
+  const backtickMatches = readmeText.match(/`([^`\n]+)`/g) ?? [];
+  for (const m of backtickMatches) {
+    const raw = m.slice(1, -1).trim();
+    if (raw.length > 1 && raw.length < 50) {
+      terms.add(raw);
+      raw.split(/[^a-zA-Z0-9]+/).forEach((p) => {
+        if (p.length > 1) terms.add(p);
+      });
+    }
+  }
+
+  const hyphenMatches = readmeText.match(/\b[A-Za-z]+-[A-Za-z0-9-]+\b/g) ?? [];
+  for (const h of hyphenMatches) {
+    if (h.length > 2 && h.length < 40) {
+      terms.add(h);
+    }
+  }
+
+  const camelMatches = readmeText.match(/\b[a-zA-Z][a-zA-Z0-9]*[A-Z][a-zA-Z0-9]*\b/g) ?? [];
+  for (const c of camelMatches) {
+    if (c.length > 2 && c.length < 50) {
+      terms.add(c);
+    }
+  }
+
+  const fileMatches = readmeText.match(/\b[A-Za-z0-9_-]+\.(?:js|ts|jsx|tsx|css|html|json)\b/g) ?? [];
+  for (const f of fileMatches) {
+    terms.add(f);
+  }
+
+  return [...terms];
+}
+
+function removeApprovedLatinTerms(
+  text: string,
+  dynamicTerms: Iterable<string> = [],
+) {
   let result = text;
 
-  const terms = [...allowedPersianLatinTerms].sort(
-    (a, b) => b.length - a.length,
-  );
+  const allTerms = new Set([...allowedPersianLatinTerms, ...dynamicTerms]);
+
+  const terms = [...allTerms]
+    .filter(Boolean)
+    .sort((a, b) => b.length - a.length);
 
   for (const term of terms) {
-    result = result.replaceAll(term, " ");
+    const escaped = term.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
+    const regex = new RegExp(`\\b${escaped}\\b`, "gi");
+    result = result.replace(regex, " ");
   }
 
   return result;
 }
 
-function containsBrokenMixedWord(text: string) {
+function containsBrokenMixedWord(
+  text: string,
+  dynamicTerms: Iterable<string> = [],
+) {
   const withoutUrls = removeUrls(text);
-  const withoutApprovedTerms = removeApprovedLatinTerms(withoutUrls);
+  const withoutApprovedTerms = removeApprovedLatinTerms(withoutUrls, dynamicTerms);
 
   return /[\u0600-\u06ff][A-Za-z]|[A-Za-z][\u0600-\u06ff]/.test(
     withoutApprovedTerms,
   );
 }
 
-function getLatinSequences(text: string) {
+function getUnapprovedLatinSequences(
+  text: string,
+  dynamicTerms: Iterable<string> = [],
+) {
   const withoutUrls = removeUrls(text);
+  const withoutApproved = removeApprovedLatinTerms(withoutUrls, dynamicTerms);
 
-  return withoutUrls.match(/[A-Za-z][A-Za-z0-9.+#-]*/g) ?? [];
+  const rawMatches = withoutApproved.match(/[A-Za-z][A-Za-z0-9.+#-]*/g) ?? [];
+
+  const lowerApproved = new Set(
+    [...allowedPersianLatinTerms, ...dynamicTerms].map((t) => t.toLowerCase()),
+  );
+
+  return rawMatches
+    .map((term) => term.replace(/[.,:;!?-]+$/, ""))
+    .filter((term) => {
+      if (!term || term.length <= 1) return false;
+      return !lowerApproved.has(term.toLowerCase());
+    });
 }
 
-function containsUnapprovedLatinSequence(text: string) {
-  const latinSequences = getLatinSequences(text);
-
-  return latinSequences.some(
-    (sequence) => !allowedPersianLatinTerms.has(sequence),
-  );
+function containsUnapprovedLatinSequence(
+  text: string,
+  dynamicTerms: Iterable<string> = [],
+) {
+  return getUnapprovedLatinSequences(text, dynamicTerms).length > 0;
 }
 
-function getUnexpectedLatinTerm(text: string) {
-  const latinSequences = getLatinSequences(text);
-
-  return (
-    latinSequences.find(
-      (sequence) => !allowedPersianLatinTerms.has(sequence),
-    ) ?? null
-  );
+function getUnexpectedLatinTerm(
+  text: string,
+  dynamicTerms: Iterable<string> = [],
+) {
+  return getUnapprovedLatinSequences(text, dynamicTerms)[0] ?? null;
 }
 
 function validateEnglishText(text: string, fieldName: string) {
@@ -339,7 +456,11 @@ function validateEnglishText(text: string, fieldName: string) {
   }
 }
 
-function validatePersianText(text: string, fieldName: string) {
+function validatePersianText(
+  text: string,
+  fieldName: string,
+  dynamicTerms: Iterable<string> = [],
+) {
   if (!text.trim()) {
     throw new Error(`${fieldName} is required.`);
   }
@@ -352,14 +473,14 @@ function validatePersianText(text: string, fieldName: string) {
     );
   }
 
-  if (containsBrokenMixedWord(text)) {
+  if (containsBrokenMixedWord(text, dynamicTerms)) {
     throw new Error(
       `${fieldName} contains an invalid mixed Persian/Latin word.`,
     );
   }
 
-  if (containsUnapprovedLatinSequence(text)) {
-    const unexpectedTerm = getUnexpectedLatinTerm(text);
+  if (containsUnapprovedLatinSequence(text, dynamicTerms)) {
+    const unexpectedTerm = getUnexpectedLatinTerm(text, dynamicTerms);
 
     throw new Error(
       `${fieldName} contains an unapproved technical term${
@@ -369,26 +490,33 @@ function validatePersianText(text: string, fieldName: string) {
   }
 }
 
-function validateProjectOutput(project: ProjectOutput) {
+function validateProjectOutput(
+  project: ProjectOutput,
+  dynamicTerms: Iterable<string> = [],
+) {
   validateEnglishText(project.title.en, "English title");
 
-  validatePersianText(project.title.fa, "Persian title");
+  validatePersianText(project.title.fa, "Persian title", dynamicTerms);
 
   validateEnglishText(project.description.en, "English description");
 
-  validatePersianText(project.description.fa, "Persian description");
+  validatePersianText(project.description.fa, "Persian description", dynamicTerms);
 
   validateEnglishText(project.content.overview.en, "English overview");
 
-  validatePersianText(project.content.overview.fa, "Persian overview");
+  validatePersianText(project.content.overview.fa, "Persian overview", dynamicTerms);
 
   validateEnglishText(project.content.challenges.en, "English challenges");
 
-  validatePersianText(project.content.challenges.fa, "Persian challenges");
+  validatePersianText(
+    project.content.challenges.fa,
+    "Persian challenges",
+    dynamicTerms,
+  );
 
   validateEnglishText(project.content.outcome.en, "English outcome");
 
-  validatePersianText(project.content.outcome.fa, "Persian outcome");
+  validatePersianText(project.content.outcome.fa, "Persian outcome", dynamicTerms);
 
   if (!project.github.trim()) {
     throw new Error("GitHub URL is required.");
@@ -411,6 +539,30 @@ function validateProjectOutput(project: ProjectOutput) {
   }
 }
 
+function repairJson(jsonStr: string): string {
+  let repaired = jsonStr.trim();
+
+  if (repaired.startsWith("```")) {
+    repaired = repaired
+      .replace(/^```(?:json)?\s*/i, "")
+      .replace(/\s*```$/i, "")
+      .trim();
+  }
+
+  // 1. Fix accidental `]` closing an object before final `}`: e.g. `}\s*]\s*}`
+  repaired = repaired.replace(/}\s*\]\s*}([\s,;]*)$/, "}\n  }\n}$1");
+
+  // 2. Remove trailing commas before `}` or `]`
+  repaired = repaired.replace(/,\s*([}\]])/g, "$1");
+
+  // 3. If root starts with `{` but ends with `]`, fix the closing
+  if (repaired.startsWith("{") && /\]\s*$/.test(repaired)) {
+    repaired = repaired.replace(/\]\s*$/, "}");
+  }
+
+  return repaired;
+}
+
 function parseAiJson(content: string): ProjectOutput {
   let cleaned = content.trim();
 
@@ -421,7 +573,17 @@ function parseAiJson(content: string): ProjectOutput {
       .trim();
   }
 
-  const parsed = JSON.parse(cleaned) as unknown;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch (initialError) {
+    try {
+      const repaired = repairJson(cleaned);
+      parsed = JSON.parse(repaired);
+    } catch {
+      throw initialError;
+    }
+  }
 
   if (!parsed || typeof parsed !== "object") {
     throw new Error("AI response is not a valid project object.");
@@ -671,6 +833,16 @@ seamless
 stunning
 impressive
 outstanding
+pixel-perfect
+pixel perfect
+
+In Persian, never use promotional words such as:
+بهترین
+عالی
+فوق‌العاده
+حرفه‌ای
+بی‌نظیر
+قدرتمند
 
 LANGUAGE RULES:
 
@@ -714,6 +886,13 @@ The technology description must:
 - describe the technology itself
 - not describe how impressive the project is
 - not claim that the project uses a feature unless repository evidence supports it
+
+TITLE:
+
+- The title must represent the actual project name or concept (e.g. "Apple Website Clone").
+- The Persian title must be an accurate, direct translation of the project title (e.g. "کلون وب‌سایت Apple" or "کلون وب‌سایت اپل").
+- NEVER include the author's name, username, portfolio name, or contact website in the title (e.g. do NOT include "Quantic Machines", "کلیکوماشین", or personal portfolio branding).
+- Keep the title concise and professional.
 
 DESCRIPTION:
 
@@ -966,8 +1145,61 @@ export async function POST(request: Request) {
 
     const cleanedProject = cleanProjectOutput(project);
 
+    console.log("GENERATED PROJECT DRAFT:", JSON.stringify(cleanedProject, null, 2));
+
+    const dynamicTerms = new Set<string>();
+
+    if (repository && typeof repository === "object") {
+      const repoObj = repository as Record<string, unknown>;
+      if (typeof repoObj.name === "string") {
+        dynamicTerms.add(repoObj.name);
+        repoObj.name.split(/[^a-zA-Z0-9]+/).forEach((t) => {
+          if (t.length > 1) dynamicTerms.add(t);
+        });
+      }
+    }
+
+    if (cleanedProject.title.en) {
+      cleanedProject.title.en.split(/[^a-zA-Z0-9]+/).forEach((t) => {
+        if (t.length > 1) dynamicTerms.add(t);
+      });
+    }
+
+    if (Array.isArray(cleanedProject.technologies)) {
+      for (const t of cleanedProject.technologies) {
+        if (t.name) {
+          dynamicTerms.add(t.name);
+          t.name.split(/[^a-zA-Z0-9]+/).forEach((sub) => {
+            if (sub.length > 1) dynamicTerms.add(sub);
+          });
+        }
+      }
+    }
+
+    if (typeof readme === "string") {
+      const technicalReadmeTerms = extractTechnicalTermsFromReadme(readme);
+      for (const term of technicalReadmeTerms) {
+        dynamicTerms.add(term);
+      }
+    }
+
+    if (packageJson && typeof packageJson === "object") {
+      const pkg = packageJson as Record<string, unknown>;
+      for (const section of ["dependencies", "devDependencies", "peerDependencies"]) {
+        const deps = pkg[section];
+        if (deps && typeof deps === "object") {
+          for (const depName of Object.keys(deps)) {
+            dynamicTerms.add(depName);
+            depName.split(/[^a-zA-Z0-9]+/).forEach((part) => {
+              if (part.length > 1) dynamicTerms.add(part);
+            });
+          }
+        }
+      }
+    }
+
     try {
-      validateProjectOutput(cleanedProject);
+      validateProjectOutput(cleanedProject, dynamicTerms);
     } catch (error) {
       console.error("AI project validation error:", error);
 

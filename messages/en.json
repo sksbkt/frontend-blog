@@ -101,5 +101,77 @@
         "linkedin": "LinkedIn",
         "email": "Email",
         "copyright": "All rights reserved."
+    },
+    "admin": {
+        "login": {
+            "title": "Portfolio Admin Studio",
+            "description": "Connect your GitHub account to import repositories, run AI project analysis, and review CMS drafts.",
+            "connect": "Connect with GitHub",
+            "envNote": "Requires GitHub OAuth App credentials in"
+        },
+        "header": {
+            "subtitle": "Portfolio CMS & AI Project Generator",
+            "githubProfile": "GitHub Profile",
+            "logout": "Logout"
+        },
+        "tabs": {
+            "repos": "Repositories",
+            "drafts": "Drafts for Review",
+            "published": "Live Projects"
+        },
+        "repos": {
+            "searchPlaceholder": "Search repositories by name or tech...",
+            "refresh": "Refresh Repos",
+            "loading": "Fetching repositories from GitHub...",
+            "empty": "No repositories found",
+            "emptyHint": "Try clearing your search query.",
+            "noDescription": "No description provided.",
+            "private": "Private",
+            "statusLive": "Live on Site",
+            "statusDraft": "Draft Pending",
+            "analyze": "Analyze & Draft",
+            "reGenerate": "Re-Generate",
+            "analyzing": "Analyzing..."
+        },
+        "drafts": {
+            "loading": "Loading drafts from Sanity CMS...",
+            "empty": "No pending drafts",
+            "emptyHint": "Go to the Repositories tab and click \"Analyze & Draft\" on any repository. The AI will generate a draft that appears here for your review!",
+            "browseRepos": "Browse Repositories",
+            "badge": "Draft Pending Review",
+            "edit": "Edit Content",
+            "approve": "Approve & Publish",
+            "technologies": "Technologies:"
+        },
+        "published": {
+            "loading": "Loading published projects from Sanity CMS...",
+            "empty": "No live projects yet",
+            "emptyHint": "Approve a draft in the Review tab to publish it to your portfolio.",
+            "viewOnSite": "View on Site",
+            "edit": "Edit",
+            "toDraft": "To Draft"
+        },
+        "edit": {
+            "title": "Review & Edit Project",
+            "cancel": "Cancel",
+            "save": "Save Changes",
+            "saving": "Saving...",
+            "titleEn": "English Title",
+            "titleFa": "عنوان فارسی",
+            "slug": "Slug",
+            "githubUrl": "GitHub URL",
+            "demoUrl": "Live Demo URL",
+            "technologies": "Technologies (comma separated)",
+            "descEn": "English Description",
+            "descFa": "توضیحات فارسی",
+            "overviewEn": "Overview (EN)",
+            "overviewFa": "بررسی اجمالی (FA)",
+            "challengesEn": "Challenges (EN)",
+            "challengesFa": "چالش‌ها (FA)",
+            "outcomeEn": "Outcome (EN)",
+            "outcomeFa": "دستاوردها (FA)"
+        },
+        "loadMore": "Load more repositories",
+        "showing": "Showing {count} of {total} repositories"
     }
 }
