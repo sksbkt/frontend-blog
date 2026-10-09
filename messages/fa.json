@@ -30,6 +30,8 @@
             "availableCount": "مورد موجود",
             "matches": "مورد"
         },
+        "noProjectsMatching": "هیچ پروژه‌ای با فیلترهای انتخابی مطابقت ندارد",
+        "clearFilters": "پاک کردن همه فیلترها",
         "page": {
             "label": "پروژه",
             "about": "درباره پروژه",

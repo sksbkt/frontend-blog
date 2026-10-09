@@ -1,6 +1,8 @@
+"use client";
+
 import { ArrowRight } from "lucide-react";
 import Image from "next/image";
-import { getLocale, getTranslations } from "next-intl/server";
+import { useLocale, useTranslations } from "next-intl";
 
 import { Link } from "@/i18n/navigation";
 import type { Project } from "@/types/project";
@@ -8,14 +10,16 @@ import type { Project } from "@/types/project";
 type ProjectCardProps = {
   project: Project;
   activeTechnologies: string[];
+  onTagClick?: (tech: string) => void;
 };
 
-export default async function ProjectCard({
+export default function ProjectCard({
   project,
   activeTechnologies,
+  onTagClick,
 }: ProjectCardProps) {
-  const locale = await getLocale();
-  const t = await getTranslations("projects.card");
+  const locale = useLocale();
+  const t = useTranslations("projects.card");
 
   const language = locale === "fa" ? "fa" : "en";
 
@@ -55,6 +59,14 @@ export default async function ProjectCard({
           {project.technologies.map((technology) => {
             const isActive = activeTechnologies.includes(technology);
 
+            const handleClick = (e: React.MouseEvent) => {
+              if (onTagClick) {
+                e.preventDefault();
+                onTagClick(technology);
+                return;
+              }
+            };
+
             const nextTechnologies = isActive
               ? activeTechnologies.filter((item) => item !== technology)
               : [...activeTechnologies, technology];
@@ -62,15 +74,18 @@ export default async function ProjectCard({
             return (
               <Link
                 key={technology}
-                href={{
-                  pathname: "/projects",
-                  query:
-                    nextTechnologies.length > 0
-                      ? {
-                          tech: nextTechnologies,
-                        }
-                      : {},
-                }}
+                href={
+                  onTagClick
+                    ? "#"
+                    : {
+                        pathname: "/projects",
+                        query:
+                          nextTechnologies.length > 0
+                            ? { tech: nextTechnologies }
+                            : {},
+                      }
+                }
+                onClick={handleClick}
                 className={`rounded-full px-3 py-1 text-xs transition-colors ${
                   isActive
                     ? "bg-primary text-primary-foreground"
@@ -93,7 +108,6 @@ export default async function ProjectCard({
             className="inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap text-sm font-medium leading-none hover:underline"
           >
             <span>{t("demo")}</span>
-
             <ArrowRight className="size-4 shrink-0 -translate-y-px rtl:rotate-180" />
           </a>
         )}

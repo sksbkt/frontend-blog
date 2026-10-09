@@ -1,28 +1,15 @@
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 
-import ProjectCard from "@/components/projects/project-card";
-import ProjectTagFilter from "@/components/projects/project-tag-filter";
-import Pagination from "@/components/shared/pagination";
+import ProjectsExplorer from "@/components/projects/projects-explorer";
 import { client } from "@/lib/sanity/client";
 import { mapSanityProject } from "@/lib/sanity/mappers";
-import {
-  projectFilterTechnologiesQuery,
-  projectsQuery,
-} from "@/lib/sanity/queries";
-
-const PROJECTS_PER_PAGE = 6;
+import { allProjectsQuery } from "@/lib/sanity/queries";
 
 type ProjectsPageProps = {
   searchParams: Promise<{
     page?: string;
     tech?: string | string[];
   }>;
-};
-
-type ProjectFilterData = {
-  totalMatching: number;
-  allTechnologies: Array<string | null>;
-  matchingTechnologies: Array<string | null>;
 };
 
 const technologyDescriptions: Record<string, string> = {
@@ -48,25 +35,22 @@ const technologyDescriptions: Record<string, string> = {
   Vercel: "A platform for deploying frontend and full-stack applications.",
 };
 
-function getTechnologyDescription(technology: string) {
-  return (
-    technologyDescriptions[technology] ??
-    `Filter projects that use ${technology}.`
-  );
-}
-
-export const dynamic = "force-dynamic";
+// Revalidate project data every 60 seconds (ISR caching)
+export const revalidate = 60;
 
 export default async function ProjectsPage({
   searchParams,
 }: ProjectsPageProps) {
-  const t = await getTranslations("projects");
+  const [t, locale] = await Promise.all([
+    getTranslations("projects"),
+    getLocale(),
+  ]);
 
   const { page: pageParam, tech: technologyParam } = await searchParams;
 
-  const page = Math.max(1, Number.parseInt(pageParam ?? "1", 10) || 1);
+  const initialPage = Math.max(1, Number.parseInt(pageParam ?? "1", 10) || 1);
 
-  const technologies = Array.isArray(technologyParam)
+  const initialTechnologies = Array.isArray(technologyParam)
     ? technologyParam.filter((technology): technology is string =>
         Boolean(technology?.trim()),
       )
@@ -74,50 +58,11 @@ export default async function ProjectsPage({
       ? [technologyParam.trim()]
       : [];
 
-  const start = (page - 1) * PROJECTS_PER_PAGE;
-  const end = start + PROJECTS_PER_PAGE + 1;
+  const sanityProjects = await client.fetch<
+    Parameters<typeof mapSanityProject>[0][]
+  >(allProjectsQuery, {}, { next: { revalidate: 60, tags: ["projects"] } });
 
-  const [sanityProjects, filterData] = await Promise.all([
-    client.fetch<Parameters<typeof mapSanityProject>[0][]>(projectsQuery, {
-      start,
-      end,
-      technologies,
-    }),
-
-    client.fetch<ProjectFilterData>(projectFilterTechnologiesQuery, {
-      technologies,
-    }),
-  ]);
-
-  const hasNextPage = sanityProjects.length > PROJECTS_PER_PAGE;
-
-  const projects = sanityProjects
-    .slice(0, PROJECTS_PER_PAGE)
-    .map(mapSanityProject);
-
-  const technologyCounts = filterData.matchingTechnologies.reduce<
-    Record<string, number>
-  >((counts, technology) => {
-    if (!technology?.trim()) {
-      return counts;
-    }
-
-    counts[technology] = (counts[technology] ?? 0) + 1;
-
-    return counts;
-  }, {});
-
-  // Remaining candidate technologies: ONLY those with count > 0 and not already active!
-  const availableTechnologies = filterData.allTechnologies
-    .filter((technology): technology is string => Boolean(technology?.trim()))
-    .filter((technology) => !technologies.includes(technology))
-    .filter((technology) => (technologyCounts[technology] ?? 0) > 0)
-    .map((technology) => ({
-      name: technology,
-      count: technologyCounts[technology] ?? 0,
-      description: getTechnologyDescription(technology),
-    }))
-    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  const projects = sanityProjects.map(mapSanityProject);
 
   return (
     <main className="py-20">
@@ -136,38 +81,32 @@ export default async function ProjectsPage({
           </p>
         </div>
 
-        <ProjectTagFilter
-          activeTechnologies={technologies}
-          availableTechnologies={availableTechnologies}
-          totalMatchingProjects={filterData.totalMatching ?? projects.length}
+        <ProjectsExplorer
+          initialProjects={projects}
+          initialTechnologies={initialTechnologies}
+          initialPage={initialPage}
+          locale={locale}
+          technologyDescriptions={technologyDescriptions}
           translations={{
-            title: t("filter.title"),
-            addFilter: t("filter.addFilter"),
-            clearAll: t("filter.clearAll"),
-            active: t("filter.active"),
-            searchPlaceholder: t("filter.searchPlaceholder"),
-            noRemaining: t("filter.noRemaining"),
-            noResults: t("filter.noResults"),
-            availableCount: t("filter.availableCount"),
-            matches: t("filter.matches"),
+            filter: {
+              title: t("filter.title"),
+              addFilter: t("filter.addFilter"),
+              clearAll: t("filter.clearAll"),
+              active: t("filter.active"),
+              searchPlaceholder: t("filter.searchPlaceholder"),
+              noRemaining: t("filter.noRemaining"),
+              noResults: t("filter.noResults"),
+              availableCount: t("filter.availableCount"),
+              matches: t("filter.matches"),
+            },
+            pagination: {
+              previous: t("page.previous"),
+              next: t("page.next"),
+              page: t("page.page"),
+            },
+            noProjectsMatching: t("noProjectsMatching"),
+            clearFilters: t("clearFilters"),
           }}
-        />
-
-        <div className="grid gap-8 md:grid-cols-2">
-          {projects.map((project) => (
-            <ProjectCard
-              key={project.id}
-              project={project}
-              activeTechnologies={technologies}
-            />
-          ))}
-        </div>
-
-        <Pagination
-          currentPage={page}
-          hasNextPage={hasNextPage}
-          basePath="/projects"
-          translationNamespace="projects.page"
         />
       </div>
     </main>

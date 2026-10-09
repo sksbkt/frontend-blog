@@ -15,6 +15,7 @@ interface ProjectTagFilterProps {
   activeTechnologies: string[];
   availableTechnologies: TagFilterItem[];
   totalMatchingProjects: number;
+  onTechnologiesChange?: (next: string[]) => void;
   translations: {
     title: string;
     addFilter: string;
@@ -32,6 +33,7 @@ export default function ProjectTagFilter({
   activeTechnologies,
   availableTechnologies,
   totalMatchingProjects,
+  onTechnologiesChange,
   translations,
 }: ProjectTagFilterProps) {
   const router = useRouter();
@@ -78,6 +80,11 @@ export default function ProjectTagFilter({
   }, [isOpen]);
 
   const updateFilters = (nextTechnologies: string[]) => {
+    if (onTechnologiesChange) {
+      onTechnologiesChange(nextTechnologies);
+      return;
+    }
+
     const params = new URLSearchParams();
     for (const tech of nextTechnologies) {
       params.append("tech", tech);

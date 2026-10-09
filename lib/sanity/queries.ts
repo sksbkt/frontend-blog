@@ -13,6 +13,21 @@ export const postsQuery = `*[
   body
 }`;
 
+export const allProjectsQuery = `*[
+  _type == "project"
+] | order(_createdAt desc) {
+  _id,
+  title,
+  slug,
+  description,
+  image,
+  technologies,
+  github,
+  demo,
+  featured,
+  content
+}`;
+
 export const projectsQuery = `*[
   _type == "project" &&
   (

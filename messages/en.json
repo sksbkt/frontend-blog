@@ -30,6 +30,8 @@
             "availableCount": "available",
             "matches": "matches"
         },
+        "noProjectsMatching": "No projects match the selected filters",
+        "clearFilters": "Clear all filters",
         "page": {
             "label": "Project",
             "about": "About the project",
