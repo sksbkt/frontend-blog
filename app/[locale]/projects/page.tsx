@@ -1,9 +1,8 @@
-import { X } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 
 import ProjectCard from "@/components/projects/project-card";
+import ProjectTagFilter from "@/components/projects/project-tag-filter";
 import Pagination from "@/components/shared/pagination";
-import { Link } from "@/i18n/navigation";
 import { client } from "@/lib/sanity/client";
 import { mapSanityProject } from "@/lib/sanity/mappers";
 import {
@@ -21,6 +20,7 @@ type ProjectsPageProps = {
 };
 
 type ProjectFilterData = {
+  totalMatching: number;
   allTechnologies: Array<string | null>;
   matchingTechnologies: Array<string | null>;
 };
@@ -107,14 +107,17 @@ export default async function ProjectsPage({
     return counts;
   }, {});
 
-  const filterTechnologies = filterData.allTechnologies
+  // Remaining candidate technologies: ONLY those with count > 0 and not already active!
+  const availableTechnologies = filterData.allTechnologies
     .filter((technology): technology is string => Boolean(technology?.trim()))
+    .filter((technology) => !technologies.includes(technology))
+    .filter((technology) => (technologyCounts[technology] ?? 0) > 0)
     .map((technology) => ({
       name: technology,
       count: technologyCounts[technology] ?? 0,
-      isActive: technologies.includes(technology),
       description: getTechnologyDescription(technology),
-    }));
+    }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 
   return (
     <main className="py-20">
@@ -133,100 +136,22 @@ export default async function ProjectsPage({
           </p>
         </div>
 
-        <section className="mb-10">
-          <div className="flex items-center justify-between gap-4">
-            <h2 className="text-sm font-medium text-muted-foreground">
-              Filter by technology
-            </h2>
-
-            {technologies.length > 0 && (
-              <div className="group relative">
-                <Link
-                  href="/projects"
-                  dir="ltr"
-                  aria-label="Clear all filters"
-                  className="inline-flex items-center gap-1.5 rounded-full border border-destructive/40 bg-destructive/5 px-3.5 py-2 text-xs font-medium text-destructive transition-all duration-200 hover:border-destructive/60 hover:bg-destructive/10"
-                >
-                  <X className="size-3.5 shrink-0" />
-                  <span>Clear all</span>
-                </Link>
-
-                <div
-                  role="tooltip"
-                  dir="ltr"
-                  className="pointer-events-none absolute right-0 top-full z-30 mt-2 w-max max-w-56 rounded-md border bg-popover px-3 py-2 text-left text-xs leading-5 text-popover-foreground opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100"
-                >
-                  Remove all active filters
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-2.5">
-            {filterTechnologies.map((technology) => {
-              const nextTechnologies = technology.isActive
-                ? technologies.filter((item) => item !== technology.name)
-                : [...technologies, technology.name];
-
-              return (
-                <div
-                  key={technology.name}
-                  className="group relative"
-                >
-                  <Link
-                    href={{
-                      pathname: "/projects",
-                      query:
-                        nextTechnologies.length > 0
-                          ? {
-                              tech: nextTechnologies,
-                            }
-                          : {},
-                    }}
-                    dir="ltr"
-                    aria-label={
-                      technology.isActive
-                        ? `Remove ${technology.name} filter`
-                        : `Filter projects by ${technology.name}`
-                    }
-                    className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-all duration-200 ${
-                      technology.isActive
-                        ? "border-primary/40 bg-primary/10 text-primary shadow-sm hover:border-primary/60 hover:bg-primary/15"
-                        : "border-border/70 bg-background text-muted-foreground hover:border-primary/40 hover:bg-muted/50 hover:text-foreground"
-                    }`}
-                  >
-                    <span>{technology.name}</span>
-
-                    {technology.isActive ? (
-                      <>
-                        <span className="transition-opacity duration-150 group-hover:hidden">
-                          {technology.count}
-                        </span>
-
-                        <X
-                          aria-hidden="true"
-                          className="hidden size-3.5 shrink-0 group-hover:block"
-                        />
-                      </>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">
-                        {technology.count}
-                      </span>
-                    )}
-                  </Link>
-
-                  <div
-                    role="tooltip"
-                    dir="ltr"
-                    className="pointer-events-none absolute left-1/2 top-full z-30 mt-2 w-max max-w-64 -translate-x-1/2 rounded-md border bg-popover px-3 py-2 text-left text-xs leading-5 text-popover-foreground opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100"
-                  >
-                    {technology.description}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
+        <ProjectTagFilter
+          activeTechnologies={technologies}
+          availableTechnologies={availableTechnologies}
+          totalMatchingProjects={filterData.totalMatching ?? projects.length}
+          translations={{
+            title: t("filter.title"),
+            addFilter: t("filter.addFilter"),
+            clearAll: t("filter.clearAll"),
+            active: t("filter.active"),
+            searchPlaceholder: t("filter.searchPlaceholder"),
+            noRemaining: t("filter.noRemaining"),
+            noResults: t("filter.noResults"),
+            availableCount: t("filter.availableCount"),
+            matches: t("filter.matches"),
+          }}
+        />
 
         <div className="grid gap-8 md:grid-cols-2">
           {projects.map((project) => (

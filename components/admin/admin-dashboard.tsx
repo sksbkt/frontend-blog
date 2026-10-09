@@ -530,14 +530,32 @@ export default function AdminDashboard({ initialSession, locale }: AdminDashboar
                   >
                     <div>
                       <div className="flex items-start justify-between gap-3 mb-3">
-                        <h3 className="font-bold text-white text-base group-hover:text-blue-400 transition-colors line-clamp-1">
-                          {repo.name}
-                        </h3>
-                        {repo.isPrivate && (
-                          <span className="text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full font-mono">
-                            Private
-                          </span>
-                        )}
+                        <a
+                          href={repo.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-bold text-white text-base hover:text-blue-400 transition-colors line-clamp-1 inline-flex items-center gap-1.5 group/link"
+                          title={`Open ${repo.fullName} on GitHub`}
+                        >
+                          <span>{repo.name}</span>
+                          <ExternalLink className="w-3.5 h-3.5 text-neutral-500 group-hover/link:text-blue-400 shrink-0" />
+                        </a>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {repo.isPrivate && (
+                            <span className="text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full font-mono">
+                              Private
+                            </span>
+                          )}
+                          <a
+                            href={repo.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="p-1 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded-lg transition-colors"
+                            title="View repository on GitHub"
+                          >
+                            <Github className="w-4 h-4" />
+                          </a>
+                        </div>
                       </div>
 
                       <p className="text-sm text-neutral-400 line-clamp-2 mb-4 min-h-[2.5rem]">
@@ -793,6 +811,20 @@ export default function AdminDashboard({ initialSession, locale }: AdminDashboar
                   </div>
 
                   <div className="flex items-center gap-3 shrink-0">
+                    {proj.github && (
+                      <a
+                        href={proj.github}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-2 px-3.5 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-semibold rounded-xl border border-neutral-700 transition-colors"
+                        title="View repository on GitHub"
+                      >
+                        <Github className="w-3.5 h-3.5" />
+                        <span>GitHub</span>
+                        <ExternalLink className="w-3 h-3 text-neutral-400" />
+                      </a>
+                    )}
+
                     <a
                       href={`/${locale}/projects/${proj.slug.current}`}
                       target="_blank"
@@ -910,9 +942,23 @@ export default function AdminDashboard({ initialSession, locale }: AdminDashboar
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-neutral-400 mb-1.5">
-                    GitHub URL
-                  </label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-medium text-neutral-400">
+                      GitHub URL
+                    </label>
+                    {editForm.github && (
+                      <a
+                        href={editForm.github}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-[11px] text-blue-400 hover:underline"
+                        title="Open GitHub repository"
+                      >
+                        <span>Open</span>
+                        <ExternalLink className="w-2.5 h-2.5" />
+                      </a>
+                    )}
+                  </div>
                   <input
                     type="text"
                     value={editForm.github}

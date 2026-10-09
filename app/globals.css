@@ -170,3 +170,140 @@
 
 @custom-variant rtl (&:where([dir="rtl"] *));
 @custom-variant ltr (&:where([dir="ltr"] *));
+
+@layer base {
+
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  input[type="button"]:not(:disabled),
+  input[type="submit"]:not(:disabled),
+  input[type="reset"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+/* Hover Marquee Scrolling Animation */
+@keyframes marquee-scroll {
+  0% {
+    transform: translateX(0%);
+  }
+
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes marquee-scroll-rtl {
+  0% {
+    transform: translateX(0%);
+  }
+
+  100% {
+    transform: translateX(50%);
+  }
+}
+
+.marquee-container {
+  overflow: hidden;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.marquee-track {
+  display: inline-block;
+  white-space: nowrap;
+  will-change: transform;
+}
+
+.marquee-clone {
+  opacity: 0;
+  transition: opacity 150ms ease-in-out;
+}
+
+.group:hover .marquee-track {
+  animation: marquee-scroll 8s linear infinite;
+}
+
+.group:hover .marquee-clone {
+  opacity: 1;
+}
+
+[dir="rtl"] .group:hover .marquee-track,
+:where([dir="rtl"] *) .group:hover .marquee-track {
+  animation: marquee-scroll-rtl 8s linear infinite;
+}
+
+/* ==========================================================================
+   Custom Global Scrollbars
+   - Track/background is always 100% transparent (no double tracks / channels)
+   - Two clean appearance states for the floating thumb:
+     1. Default (unhovered): subtle / less visible
+     2. Hovered / active: prominent / more visible
+   - Rounded pill shape with inset margin from container edge
+   - Arrows completely removed
+   ========================================================================== */
+
+/* Firefox scrollbar (only when webkit scrollbars are unsupported) */
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--foreground) 25%, transparent) transparent;
+  }
+
+  *:hover {
+    scrollbar-color: color-mix(in srgb, var(--foreground) 65%, transparent) transparent;
+  }
+}
+
+/* WebKit / Chromium / Edge / Safari custom scrollbars */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+  background-color: transparent !important;
+}
+
+/* Remove all scrollbar arrows/buttons */
+::-webkit-scrollbar-button {
+  display: none !important;
+  width: 0px !important;
+  height: 0px !important;
+  background: transparent !important;
+}
+
+/* Track & track piece: strictly transparent in ALL states (no second track/channel) */
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-track-piece {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  margin: 0 !important;
+}
+
+::-webkit-scrollbar-track:hover,
+::-webkit-scrollbar-track-piece:hover {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* State 1: Default (not hovered) - ultra-thin (4px) with generous 4px margin from frame edge */
+::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--foreground) 25%, transparent);
+  border-radius: 9999px;
+  border: 4px solid transparent;
+  background-clip: padding-box;
+  min-height: 36px;
+  min-width: 36px;
+  transition: background-color 0.2s ease-in-out, border-width 0.2s ease-in-out;
+}
+
+/* State 2: Hovered / active - expands to thicker (8px), closer, and prominently highlighted */
+::-webkit-scrollbar-thumb:hover,
+::-webkit-scrollbar-thumb:active {
+  background-color: color-mix(in srgb, var(--foreground) 75%, transparent) !important;
+  border-width: 4px;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent !important;
+}

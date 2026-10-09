@@ -19,6 +19,17 @@
             "demo": "Live Demo",
             "github": "GitHub"
         },
+        "filter": {
+            "title": "Filter by technology",
+            "addFilter": "Add filter",
+            "clearAll": "Clear all",
+            "active": "Active tags",
+            "searchPlaceholder": "Search available tags...",
+            "noRemaining": "No other tags match current filters",
+            "noResults": "No tags matching",
+            "availableCount": "available",
+            "matches": "matches"
+        },
         "page": {
             "label": "Project",
             "about": "About the project",

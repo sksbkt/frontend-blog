@@ -17,7 +17,7 @@ export const projectsQuery = `*[
   _type == "project" &&
   (
     count($technologies) == 0 ||
-    count(technologies[@ in $technologies]) > 0
+    count(technologies[@ in $technologies]) == count($technologies)
   )
 ] | order(_createdAt desc) [$start...$end] {
   _id,
@@ -33,6 +33,13 @@ export const projectsQuery = `*[
 }`;
 
 export const projectFilterTechnologiesQuery = `{
+  "totalMatching": count(*[
+    _type == "project" &&
+    (
+      count($technologies) == 0 ||
+      count(technologies[@ in $technologies]) == count($technologies)
+    )
+  ]),
   "allTechnologies": array::unique(
     *[_type == "project"].technologies[@ != "" && defined(@)]
   ),
@@ -40,7 +47,7 @@ export const projectFilterTechnologiesQuery = `{
     _type == "project" &&
     (
       count($technologies) == 0 ||
-      count(technologies[@ in $technologies]) > 0
+      count(technologies[@ in $technologies]) == count($technologies)
     )
   ].technologies[@ != "" && defined(@)]
 }`;

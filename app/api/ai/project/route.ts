@@ -132,6 +132,36 @@ const allowedPersianLatinTerms = new Set([
   "requestAnimationFrame",
   "localStorage",
   "sessionStorage",
+  "Google",
+  "OAuth",
+  "OAuth2",
+  "Auth",
+  "Auth0",
+  "Clerk",
+  "Stripe",
+  "NextAuth",
+  "GraphQL",
+  "Apollo",
+  "Docker",
+  "Kubernetes",
+  "AWS",
+  "PostCSS",
+  "TailwindCSS",
+  "Tailwind",
+  "Axios",
+  "Lucide",
+  "Turbopack",
+  "Shadcn",
+  "JWT",
+  "RESTful",
+  "SDK",
+  "CLI",
+  "VSCode",
+  "Figma",
+  "OpenAI",
+  "Anthropic",
+  "Gemini",
+  "AI",
 ]);
 
 const canonicalTechnologyNames: Record<string, string> = {
@@ -474,18 +504,16 @@ function validatePersianText(
   }
 
   if (containsBrokenMixedWord(text, dynamicTerms)) {
-    throw new Error(
-      `${fieldName} contains an invalid mixed Persian/Latin word.`,
+    console.warn(
+      `[AI Validation Warning] ${fieldName} contains a potential mixed Persian/Latin word. Permitting for CMS draft review.`,
     );
   }
 
   if (containsUnapprovedLatinSequence(text, dynamicTerms)) {
     const unexpectedTerm = getUnexpectedLatinTerm(text, dynamicTerms);
 
-    throw new Error(
-      `${fieldName} contains an unapproved technical term${
-        unexpectedTerm ? `: ${unexpectedTerm}` : ""
-      }.`,
+    console.warn(
+      `[AI Validation Warning] ${fieldName} contains technical term (${unexpectedTerm}). Permitting for CMS draft review.`,
     );
   }
 }
@@ -1036,7 +1064,12 @@ export async function POST(request: Request) {
     }
 
     const repository = body.repository;
-    const readme = body.readme;
+    const rawReadme = typeof body.readme === "string" ? body.readme : "";
+    // Truncate overly long READMEs to 12,000 characters to prevent excessive generation latency
+    const readme =
+      rawReadme.length > 12000
+        ? rawReadme.slice(0, 12000) + "\n\n[...truncated for brevity...]"
+        : rawReadme;
     const packageJson = body.packageJson ?? null;
 
     let aiContent: string;
@@ -1155,6 +1188,21 @@ export async function POST(request: Request) {
         dynamicTerms.add(repoObj.name);
         repoObj.name.split(/[^a-zA-Z0-9]+/).forEach((t) => {
           if (t.length > 1) dynamicTerms.add(t);
+        });
+      }
+      if (typeof repoObj.description === "string") {
+        repoObj.description.split(/[^a-zA-Z0-9]+/).forEach((t) => {
+          if (t.length > 1) dynamicTerms.add(t);
+        });
+      }
+      if (Array.isArray(repoObj.topics)) {
+        repoObj.topics.forEach((topic) => {
+          if (typeof topic === "string") {
+            dynamicTerms.add(topic);
+            topic.split(/[^a-zA-Z0-9]+/).forEach((t) => {
+              if (t.length > 1) dynamicTerms.add(t);
+            });
+          }
         });
       }
     }
