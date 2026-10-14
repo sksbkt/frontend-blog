@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useLocale } from "next-intl";
 import { usePathname, useRouter } from "@/i18n/navigation";
 import { AnimatePresence, motion } from "framer-motion";
@@ -13,7 +14,18 @@ export function LanguageSwitcher() {
 
   const nextLocale = locale === "fa" ? "en" : "fa";
 
+  useEffect(() => {
+    try {
+      localStorage.setItem("user_locale", locale);
+      localStorage.setItem("preferred_lang", locale);
+    } catch {}
+  }, [locale]);
+
   function switchLanguage() {
+    try {
+      localStorage.setItem("user_locale", nextLocale);
+      localStorage.setItem("preferred_lang", nextLocale);
+    } catch {}
     router.replace(pathname, {
       locale: nextLocale,
     });

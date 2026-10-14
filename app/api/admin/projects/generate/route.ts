@@ -1,60 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-
-type GitHubRepository = {
-  name: string;
-  full_name: string;
-  description: string | null;
-  html_url: string;
-  homepage: string | null;
-  language: string | null;
-  topics: string[];
-};
-
-type GitHubFile = {
-  content: string;
-  encoding: string;
-};
-
-async function githubFetch<T>(url: string, token: string): Promise<T> {
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/vnd.github+json",
-      "X-GitHub-Api-Version": "2022-11-28",
-      "User-Agent": "Portfolio-Admin-CMS",
-    },
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    throw new Error(`GitHub request failed with status ${response.status}`);
-  }
-
-  return response.json() as Promise<T>;
-}
-
-async function githubFetchOptional<T>(url: string, token: string): Promise<T | null> {
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/vnd.github+json",
-      "X-GitHub-Api-Version": "2022-11-28",
-      "User-Agent": "Portfolio-Admin-CMS",
-    },
-    cache: "no-store",
-  });
-
-  if (response.status === 404) {
-    return null;
-  }
-
-  if (!response.ok) {
-    throw new Error(`GitHub request failed with status ${response.status}`);
-  }
-
-  return response.json() as Promise<T>;
-}
+import { inspectRepository } from "@/lib/github/repo-inspector";
+import { generateRepoAudit } from "@/lib/ai/repo-auditor";
 
 export async function POST(request: Request) {
   const session = await getSession();
@@ -77,35 +24,23 @@ export async function POST(request: Request) {
       );
     }
 
-    const [owner, repo] = fullName.split("/");
-    const apiBase = `https://api.github.com/repos/${owner}/${repo}`;
+    // 1. Inspect repository context (README, file tree, package.json, entry points)
+    const repoContext = await inspectRepository(fullName, session.accessToken);
 
-    // 1. Fetch repo data, README, and package.json with admin's GitHub token
-    const [repoData, readmeData, packageJsonData] = await Promise.all([
-      githubFetch<GitHubRepository>(apiBase, session.accessToken),
-      githubFetch<GitHubFile>(`${apiBase}/readme`, session.accessToken),
-      githubFetchOptional<GitHubFile>(`${apiBase}/contents/package.json`, session.accessToken),
-    ]);
-
-    const readme = Buffer.from(
-      readmeData.content,
-      readmeData.encoding as BufferEncoding,
-    ).toString("utf-8");
-
-    let packageJson: Record<string, unknown> | null = null;
-    if (packageJsonData) {
-      try {
-        const pkgStr = Buffer.from(
-          packageJsonData.content,
-          packageJsonData.encoding as BufferEncoding,
-        ).toString("utf-8");
-        packageJson = JSON.parse(pkgStr);
-      } catch (err) {
-        console.warn("Failed to parse package.json from repo:", err);
-      }
+    // 2. Generate audit report & bilingual README draft via Gemini
+    let auditResult = null;
+    try {
+      auditResult = await generateRepoAudit(repoContext);
+    } catch (auditErr) {
+      console.warn("Failed to generate audit report:", auditErr);
     }
 
-    // 2. Call the AI project generation endpoint
+    // 3. Prepare README content for Sanity draft creation (existing README or generated README)
+    const readmeForDraft = repoContext.readme.exists
+      ? repoContext.readme.content
+      : auditResult?.bilingualReadmeDraft || `# ${repoContext.repository.name}\n\n${repoContext.repository.description || "Portfolio project."}`;
+
+    // 4. Call the AI project generation endpoint to create Sanity draft
     const aiApiUrl = new URL("/api/ai/project", request.url).toString();
     const aiResponse = await fetch(aiApiUrl, {
       method: "POST",
@@ -113,9 +48,17 @@ export async function POST(request: Request) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        repository: repoData,
-        readme,
-        packageJson,
+        repository: {
+          name: repoContext.repository.name,
+          full_name: repoContext.repository.fullName,
+          description: repoContext.repository.description,
+          html_url: repoContext.repository.htmlUrl,
+          homepage: repoContext.repository.homepage,
+          language: repoContext.repository.language,
+          topics: repoContext.repository.topics,
+        },
+        readme: readmeForDraft,
+        packageJson: repoContext.packageJson,
       }),
     });
 
@@ -127,6 +70,8 @@ export async function POST(request: Request) {
           success: false,
           message: aiResult.message || "Failed to generate AI project draft.",
           error: aiResult.error || null,
+          audit: auditResult,
+          readmeDraft: auditResult?.bilingualReadmeDraft || null,
         },
         { status: aiResponse.status || 500 },
       );
@@ -137,6 +82,18 @@ export async function POST(request: Request) {
       message: "Repository successfully analyzed and draft created in Sanity!",
       project: aiResult.project,
       draft: aiResult.draft,
+      audit: auditResult,
+      readmeDraft: auditResult?.bilingualReadmeDraft || null,
+      context: {
+        fullName,
+        hasReadme: repoContext.readme.exists,
+        readmeSize: repoContext.readme.size,
+        totalFiles: repoContext.structure.totalFiles,
+        configFiles: repoContext.structure.configFiles,
+        entryPoint: repoContext.structure.entryPoint.path,
+        hasPackageJson: Boolean(repoContext.packageJson),
+        defaultBranch: repoContext.repository.defaultBranch,
+      },
     });
   } catch (error) {
     console.error("Generate project draft error:", error);

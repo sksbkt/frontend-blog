@@ -47,6 +47,22 @@ type SanityProject = {
   };
   description: SanityTextValue;
   image?: unknown;
+  coverImage?: unknown;
+  gallery?: Array<{
+    _key?: string;
+    caption?: string;
+    alt?: string;
+    asset?: unknown;
+  }>;
+  video?: {
+    enabled?: boolean;
+    url?: string;
+    asset?: unknown;
+  };
+  previewGif?: {
+    enabled?: boolean;
+    asset?: unknown;
+  };
   technologies?: string[];
   github?: string;
   demo?: string;
@@ -244,7 +260,78 @@ export function mapSanityPost(post: SanityPost): BlogPost {
   };
 }
 
+export function getGitHubOpenGraphUrl(githubUrl?: string, repoFullName?: string): string | null {
+  if (repoFullName && repoFullName.includes("/")) {
+    return `https://opengraph.githubassets.com/1/${repoFullName.trim()}`;
+  }
+  if (!githubUrl) return null;
+  try {
+    const clean = githubUrl
+      .replace(/^https?:\/\/github\.com\//i, "")
+      .replace(/\/$/, "")
+      .replace(/\.git$/i, "");
+    const parts = clean.split("/");
+    if (parts.length >= 2 && parts[0] && parts[1]) {
+      return `https://opengraph.githubassets.com/1/${parts[0]}/${parts[1]}`;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 export function mapSanityProject(project: SanityProject): Project {
+  // Determine GitHub OpenGraph fallback URL
+  const openGraphImage = getGitHubOpenGraphUrl(project.github) ?? undefined;
+
+  // Cover image precedence: coverImage -> image -> openGraphImage fallback
+  let resolvedCoverImage = "";
+  if (project.coverImage) {
+    try {
+      resolvedCoverImage = urlFor(project.coverImage).width(1200).url();
+    } catch {
+      resolvedCoverImage = "";
+    }
+  }
+  if (!resolvedCoverImage && project.image) {
+    try {
+      resolvedCoverImage = urlFor(project.image).width(1200).url();
+    } catch {
+      resolvedCoverImage = "";
+    }
+  }
+  if (!resolvedCoverImage && openGraphImage) {
+    resolvedCoverImage = openGraphImage;
+  }
+
+  // Map gallery items safely
+  const mappedGallery = (project.gallery || [])
+    .map((item) => {
+      try {
+        if (!item.asset) return null;
+        const url = urlFor(item.asset).width(1200).url();
+        return {
+          _key: item._key,
+          url,
+          caption: item.caption,
+          alt: item.alt,
+        };
+      } catch {
+        return null;
+      }
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null);
+
+  // Map video & gif safely
+  let previewGifUrl: string | undefined;
+  if (project.previewGif?.asset) {
+    try {
+      previewGifUrl = urlFor(project.previewGif.asset).url();
+    } catch {
+      previewGifUrl = undefined;
+    }
+  }
+
   return {
     id: project._id,
 
@@ -260,7 +347,24 @@ export function mapSanityProject(project: SanityProject): Project {
       fa: project.description?.fa ?? "",
     },
 
-    image: project.image ? urlFor(project.image).width(1200).url() : "",
+    image: resolvedCoverImage,
+    coverImage: resolvedCoverImage,
+    openGraphImage,
+    gallery: mappedGallery,
+
+    video: project.video
+      ? {
+          enabled: project.video.enabled ?? false,
+          url: project.video.url,
+        }
+      : undefined,
+
+    previewGif: project.previewGif
+      ? {
+          enabled: project.previewGif.enabled ?? false,
+          url: previewGifUrl,
+        }
+      : undefined,
 
     technologies: project.technologies ?? [],
 

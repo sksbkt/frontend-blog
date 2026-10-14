@@ -27,6 +27,35 @@ export async function GET() {
         featured,
         content,
         image,
+        coverImage{
+          ...,
+          asset->{
+            _id,
+            url
+          }
+        },
+        gallery[]{
+          ...,
+          asset->{
+            _id,
+            url
+          }
+        },
+        video{
+          enabled,
+          url,
+          asset->{
+            _id,
+            url
+          }
+        },
+        previewGif{
+          ...,
+          asset->{
+            _id,
+            url
+          }
+        },
         "isDraft": _id in path("drafts.**")
       }`,
     );
@@ -181,6 +210,11 @@ export async function PATCH(request: Request) {
       "demo",
       "featured",
       "content",
+      "coverImage",
+      "gallery",
+      "video",
+      "previewGif",
+      "image",
     ];
 
     const patchData: Record<string, unknown> = {};

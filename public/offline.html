@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>شما آفلاین هستید — You're Offline</title>
+  <link rel="icon" href="/favicon.ico">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#090d16">
+  <style>
+    @font-face {
+      font-family: 'Vazirmatn';
+      src: url('/fonts/Vazirmatn-Regular.ttf') format('truetype');
+      font-weight: normal;
+      font-style: normal;
+      font-display: swap;
+    }
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: radial-gradient(circle at 50% 20%, #1e1b4b 0%, #090d16 65%, #030712 100%);
+      color: #f3f4f6;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      text-align: center;
+      direction: rtl;
+      transition: background 0.5s ease;
+    }
+    body.is-en {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      direction: ltr;
+    }
+    .card {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 1.5rem;
+      padding: 3.25rem 2rem 2.25rem;
+      max-width: 480px;
+      width: 100%;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 40px rgba(99, 102, 241, 0.15);
+      position: relative;
+      overflow: hidden;
+      transition: all 0.5s ease;
+    }
+    .card.connected {
+      border-color: rgba(16, 185, 129, 0.4);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 50px rgba(16, 185, 129, 0.2);
+    }
+    .lang-toggle {
+      position: absolute;
+      top: 1.25rem;
+      left: 1.25rem;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #cbd5e1;
+      padding: 0.35rem 0.85rem;
+      border-radius: 9999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      z-index: 10;
+    }
+    body.is-en .lang-toggle {
+      left: auto;
+      right: 1.25rem;
+    }
+    .lang-toggle:hover {
+      background: rgba(255, 255, 255, 0.18);
+      color: #ffffff;
+      transform: scale(1.03);
+    }
+    .icon-wrapper {
+      position: relative;
+      width: 88px;
+      height: 88px;
+      margin: 0 auto 1.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .icon-pulse {
+      position: absolute;
+      inset: -8px;
+      border-radius: 50%;
+      background: rgba(239, 68, 68, 0.15);
+      animation: pulse 2.5s infinite;
+      transition: all 0.5s ease;
+    }
+    .card.connected .icon-pulse {
+      background: rgba(16, 185, 129, 0.2);
+    }
+    .icon-bg {
+      width: 76px;
+      height: 76px;
+      border-radius: 50%;
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #f87171;
+      transition: all 0.5s ease;
+    }
+    .card.connected .icon-bg {
+      background: rgba(16, 185, 129, 0.15);
+      border-color: rgba(16, 185, 129, 0.4);
+      color: #34d399;
+    }
+    @keyframes pulse {
+      0% { transform: scale(0.9); opacity: 0.8; }
+      50% { transform: scale(1.15); opacity: 0.3; }
+      100% { transform: scale(0.9); opacity: 0.8; }
+    }
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      margin-bottom: 0.75rem;
+      color: #ffffff;
+      transition: color 0.3s ease;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(239, 68, 68, 0.15);
+      color: #fca5a5;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      margin-bottom: 1.25rem;
+      transition: all 0.5s ease;
+    }
+    .card.connected .badge {
+      background: rgba(16, 185, 129, 0.15);
+      color: #6ee7b7;
+      border-color: rgba(16, 185, 129, 0.4);
+    }
+    .badge-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background-color: #ef4444;
+      animation: blink 1.5s infinite;
+      transition: background-color 0.5s ease;
+    }
+    .card.connected .badge-dot {
+      background-color: #10b981;
+      animation: none;
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+    p {
+      color: #94a3b8;
+      font-size: 0.95rem;
+      line-height: 1.8;
+      margin-bottom: 1.25rem;
+      transition: color 0.3s ease;
+    }
+    .target-badge {
+      display: inline-block;
+      direction: ltr;
+      unicode-bidi: embed;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 0.5rem;
+      padding: 0.25rem 0.6rem;
+      font-family: monospace;
+      font-size: 0.8rem;
+      color: #38bdf8;
+      margin-bottom: 1.5rem;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      background: linear-gradient(135deg, #38bdf8, #6366f1);
+      color: #ffffff;
+      font-weight: 600;
+      font-size: 0.9375rem;
+      padding: 0.75rem 1.75rem;
+      border-radius: 0.75rem;
+      border: none;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 14px 0 rgba(99, 102, 241, 0.39);
+      width: 100%;
+    }
+    .card.connected .btn {
+      background: linear-gradient(135deg, #10b981, #059669);
+      box-shadow: 0 4px 14px 0 rgba(16, 185, 129, 0.4);
+    }
+    .btn:hover {
+      transform: translateY(-1px);
+    }
+    .btn:disabled {
+      opacity: 0.8;
+      cursor: default;
+      transform: none;
+    }
+    .status-msg {
+      font-size: 0.825rem;
+      color: #64748b;
+      margin-top: 1rem;
+      min-height: 1.25rem;
+      transition: color 0.3s ease;
+    }
+    .card.connected .status-msg {
+      color: #34d399;
+      font-weight: 500;
+    }
+    .auto-sync-note {
+      margin-top: 1.25rem;
+      font-size: 0.75rem;
+      color: #475569;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.375rem;
+    }
+    .spinner {
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body id="body-el">
+  <div id="main-card" class="card">
+    <button id="lang-btn" class="lang-toggle" type="button">
+      <span id="lang-label">English</span>
+    </button>
+
+    <div class="icon-wrapper">
+      <div class="icon-pulse"></div>
+      <div id="icon-bg" class="icon-bg">
+        <!-- Default WifiOff Icon -->
+        <svg id="icon-wifioff" xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="2" x2="22" y1="2" y2="22"></line>
+          <path d="M8.5 16.5a5 5 0 0 1 7 0"></path>
+          <path d="M2 8.82a15 15 0 0 1 4.17-2.65"></path>
+          <path d="M10.66 5c4.01-.36 8.14.9 11.34 3.76"></path>
+          <path d="M16.85 11.25a10 10 0 0 1 2.22 1.68"></path>
+          <path d="M5 13a10 10 0 0 1 5.24-2.76"></path>
+          <line x1="12" x2="12.01" y1="20" y2="20"></line>
+        </svg>
+
+        <!-- Connected Checkmark / Wifi Icon (hidden by default) -->
+        <svg id="icon-wifion" style="display:none;" xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 6 9 17l-5-5"></path>
+        </svg>
+      </div>
+    </div>
+
+    <div class="badge">
+      <span class="badge-dot"></span>
+      <span id="badge-text">عدم اتصال به اینترنت</span>
+    </div>
+
+    <h1 id="title-text">شما آفلاین هستید</h1>
+    <p id="desc-text">
+      ارتباط شما با اینترنت قطع شده است. به محض برقراری اتصال، صفحه به طور خودکار بارگذاری خواهد شد.
+    </p>
+
+    <div id="target-container" style="display:none;">
+      <div id="target-pill" class="target-badge"></div>
+    </div>
+
+    <button id="retry-btn" class="btn" type="button">
+      <svg id="btn-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+        <path d="M3 3v5h5"></path>
+        <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path>
+        <path d="M16 21h5v-5"></path>
+      </svg>
+      <span id="btn-text">تلاش برای اتصال مجدد</span>
+    </button>
+
+    <div id="status-text" class="status-msg"></div>
+
+    <div class="auto-sync-note">
+      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <polyline points="12 6 12 12 16 14"></polyline>
+      </svg>
+      <span id="sync-note">همگام‌سازی خودکار فعال است: در حال پایش وضعیت شبکه</span>
+    </div>
+  </div>
+
+  <script>
+    var translations = {
+      fa: {
+        badgeOffline: "عدم اتصال به اینترنت",
+        badgeOnline: "اتصال اینترنت برقرار شد!",
+        titleOffline: "شما آفلاین هستید",
+        titleOnline: "دوباره آنلاین شدید!",
+        descOffline: "ارتباط با اینترنت قطع شده است. به محض وصل شدن اینترنت، صفحه به طور خودکار بارگذاری خواهد شد.",
+        descOnline: "ارتباط اینترنت با موفقیت بازیابی شد. در حال انتقال به صفحه مقصد...",
+        btnOffline: "تلاش برای اتصال مجدد",
+        btnChecking: "در حال بررسی اتصال...",
+        btnOnline: "در حال انتقال...",
+        stillOffline: "هنوز ارتباط برقرار نشده است. لطفاً وضعیت وای‌فای یا داده را بررسی نمایید.",
+        targetPrefix: "صفحه مقصد: ",
+        syncNote: "همگام‌سازی خودکار فعال است: در حال پایش پیوسته شبکه",
+        toggle: "English"
+      },
+      en: {
+        badgeOffline: "No Internet Connection",
+        badgeOnline: "Connection Restored!",
+        titleOffline: "You're Offline",
+        titleOnline: "Back Online!",
+        descOffline: "It seems you lost your internet connection. As soon as you are reconnected, this page will redirect automatically.",
+        descOnline: "Connection re-established successfully. Redirecting you to your page now...",
+        btnOffline: "Try Reconnecting",
+        btnChecking: "Checking connection...",
+        btnOnline: "Redirecting...",
+        stillOffline: "Still offline. Please check your Wi-Fi or mobile data.",
+        targetPrefix: "Destination: ",
+        syncNote: "Auto-sync active: continuously monitoring network",
+        toggle: "فارسی"
+      }
+    };
+
+    // Extract target destination URL
+    var params = new URLSearchParams(window.location.search);
+    var fromParam = params.get("from");
+    var targetUrl = "";
+
+    if (fromParam) {
+      targetUrl = fromParam;
+    } else if (document.referrer && document.referrer.indexOf(window.location.origin) === 0 && document.referrer.indexOf("offline") === -1) {
+      targetUrl = document.referrer;
+    }
+
+    // Determine Language
+    function getInitialLanguage() {
+      try {
+        var search = window.location.search.toLowerCase();
+        if (search.indexOf("lang=en") !== -1) return "en";
+        if (search.indexOf("lang=fa") !== -1) return "fa";
+
+        var path = window.location.pathname.toLowerCase();
+        if (path.indexOf("/en") === 0) return "en";
+        if (path.indexOf("/fa") === 0) return "fa";
+
+        if (targetUrl) {
+          if (targetUrl.indexOf("/en") !== -1) return "en";
+          if (targetUrl.indexOf("/fa") !== -1) return "fa";
+        }
+
+        var stored = localStorage.getItem("user_locale") || localStorage.getItem("preferred_lang");
+        if (stored === "en" || stored === "fa") return stored;
+
+        var cookieMatch = document.cookie.match(/NEXT_LOCALE=(fa|en)/);
+        if (cookieMatch && cookieMatch[1]) return cookieMatch[1];
+
+        if (navigator.language && navigator.language.toLowerCase().indexOf("fa") === 0) return "fa";
+      } catch (e) {}
+
+      return "fa";
+    }
+
+    var currentLang = getInitialLanguage();
+    if (!targetUrl) {
+      targetUrl = "/" + currentLang;
+    }
+
+    // Show target pill if available
+    var targetContainer = document.getElementById("target-container");
+    var targetPill = document.getElementById("target-pill");
+    if (targetUrl && targetUrl !== "/offline.html" && targetUrl !== "/offline") {
+      targetContainer.style.display = "block";
+      targetPill.textContent = targetUrl;
+    }
+
+    var isConnected = false;
+
+    function applyLanguage(lang) {
+      currentLang = lang;
+      try {
+        localStorage.setItem("user_locale", lang);
+        localStorage.setItem("preferred_lang", lang);
+      } catch (e) {}
+
+      var body = document.getElementById("body-el");
+      var isFa = lang === "fa";
+      if (isFa) {
+        body.classList.remove("is-en");
+        body.dir = "rtl";
+      } else {
+        body.classList.add("is-en");
+        body.dir = "ltr";
+      }
+
+      var t = translations[lang];
+      document.getElementById("lang-label").textContent = t.toggle;
+      document.getElementById("sync-note").textContent = t.syncNote;
+
+      if (isConnected) {
+        document.getElementById("badge-text").textContent = t.badgeOnline;
+        document.getElementById("title-text").textContent = t.titleOnline;
+        document.getElementById("desc-text").textContent = t.descOnline;
+        document.getElementById("btn-text").textContent = t.btnOnline;
+      } else {
+        document.getElementById("badge-text").textContent = t.badgeOffline;
+        document.getElementById("title-text").textContent = t.titleOffline;
+        document.getElementById("desc-text").textContent = t.descOffline;
+        document.getElementById("btn-text").textContent = t.btnOffline;
+      }
+    }
+
+    document.getElementById("lang-btn").addEventListener("click", function() {
+      applyLanguage(currentLang === "fa" ? "en" : "fa");
+    });
+
+    applyLanguage(currentLang);
+
+    // Dynamic state transition to Emerald Green upon reconnection
+    function onConnectionRestored() {
+      if (isConnected) return;
+      isConnected = true;
+
+      var card = document.getElementById("main-card");
+      card.classList.add("connected");
+
+      // Switch icons
+      document.getElementById("icon-wifioff").style.display = "none";
+      document.getElementById("icon-wifion").style.display = "block";
+
+      // Switch text
+      var t = translations[currentLang];
+      document.getElementById("badge-text").textContent = t.badgeOnline;
+      document.getElementById("title-text").textContent = t.titleOnline;
+      document.getElementById("desc-text").textContent = t.descOnline;
+      document.getElementById("btn-text").textContent = t.btnOnline;
+      document.getElementById("status-text").textContent = t.descOnline;
+
+      var btn = document.getElementById("retry-btn");
+      btn.disabled = true;
+      var btnIcon = document.getElementById("btn-icon");
+      btnIcon.classList.add("spinner");
+
+      // Redirect smoothly to target
+      setTimeout(function() {
+        window.location.href = targetUrl;
+      }, 700);
+    }
+
+    // Heartbeat connection checker
+    function checkConnection(isManual) {
+      if (isConnected) return;
+
+      var btnText = document.getElementById("btn-text");
+      var statusText = document.getElementById("status-text");
+      var t = translations[currentLang];
+
+      if (isManual) {
+        btnText.textContent = t.btnChecking;
+      }
+
+      fetch("/manifest.json?_t=" + Date.now(), { method: "HEAD", cache: "no-store" })
+        .then(function(res) {
+          if (res.ok) {
+            onConnectionRestored();
+          } else {
+            throw new Error("Offline");
+          }
+        })
+        .catch(function() {
+          if (isManual) {
+            setTimeout(function() {
+              btnText.textContent = t.btnOffline;
+              statusText.textContent = t.stillOffline;
+            }, 600);
+          }
+        });
+    }
+
+    document.getElementById("retry-btn").addEventListener("click", function() {
+      checkConnection(true);
+    });
+
+    // 1. Reactive listener to browser online event
+    window.addEventListener("online", function() {
+      onConnectionRestored();
+    });
+
+    // 2. Continuous Heartbeat Polling every 2.5 seconds
+    setInterval(function() {
+      if (!isConnected) {
+        checkConnection(false);
+      }
+    }, 2500);
+
+    // Initial check on load
+    if (navigator.onLine) {
+      checkConnection(false);
+    }
+  </script>
+</body>
+</html>

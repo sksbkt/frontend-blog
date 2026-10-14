@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 
 import { Link } from "@/i18n/navigation";
-import { client } from "@/lib/sanity/client";
+import { client, safeFetch } from "@/lib/sanity/client";
 import { mapSanityPost } from "@/lib/sanity/mappers";
 import { highlightCode } from "@/lib/shiki";
 
@@ -33,14 +33,17 @@ type ArticlePageProps = {
 };
 
 async function getPost(slug: string) {
-  const sanityPost: Parameters<typeof mapSanityPost>[0] | null =
-    await client.fetch(
-      postBySlugQuery,
-      { slug },
-      {
-        cache: "no-store",
-      },
-    );
+  const sanityPost: Parameters<typeof mapSanityPost>[0] | null = await safeFetch(
+    () =>
+      client.fetch(
+        postBySlugQuery,
+        { slug },
+        {
+          cache: "no-store",
+        },
+      ),
+    null
+  );
 
   if (!sanityPost) {
     return null;

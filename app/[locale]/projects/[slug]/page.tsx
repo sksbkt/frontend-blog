@@ -9,7 +9,7 @@ import {
 } from "react-icons/fa";
 
 import { Link } from "@/i18n/navigation";
-import { client } from "@/lib/sanity/client";
+import { client, safeFetch } from "@/lib/sanity/client";
 import { mapSanityProject } from "@/lib/sanity/mappers";
 
 type ProjectPageProps = {
@@ -28,6 +28,10 @@ const projectBySlugQuery = `*[
   slug,
   description,
   image,
+  coverImage,
+  gallery,
+  video,
+  previewGif,
   technologies,
   github,
   demo,
@@ -38,12 +42,16 @@ const projectBySlugQuery = `*[
 export const dynamic = "force-dynamic";
 
 async function getProject(slug: string) {
-  const sanityProject = await client.fetch(
-    projectBySlugQuery,
-    { slug },
-    {
-      cache: "no-store",
-    },
+  const sanityProject = await safeFetch(
+    () =>
+      client.fetch(
+        projectBySlugQuery,
+        { slug },
+        {
+          cache: "no-store",
+        },
+      ),
+    null
   );
 
   if (!sanityProject) {

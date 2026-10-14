@@ -122,30 +122,51 @@ function getGitHubSocialImageUrl(githubUrl: string) {
 }
 
 async function uploadProjectImage(githubUrl: string, title: string) {
-  const imageUrl = getGitHubSocialImageUrl(githubUrl);
+  try {
+    const imageUrl = getGitHubSocialImageUrl(githubUrl);
+    const response = await fetch(imageUrl);
 
-  const response = await fetch(imageUrl);
+    if (response.ok) {
+      const contentType = response.headers.get("content-type") ?? "image/png";
+      const imageBuffer = Buffer.from(await response.arrayBuffer());
 
-  if (!response.ok) {
-    throw new Error(
-      `Failed to download GitHub project image: ${response.status}`,
+      const asset = await writeClient.assets.upload("image", imageBuffer, {
+        filename: `${title.toLowerCase().replace(/\s+/g, "-")}.png`,
+        contentType,
+      });
+
+      return {
+        _type: "image",
+        asset: {
+          _type: "reference",
+          _ref: asset._id,
+        },
+        alt: title,
+      };
+    }
+  } catch (err) {
+    console.warn(
+      "GitHub social image download failed, generating fallback image asset:",
+      err,
     );
   }
 
-  const contentType = response.headers.get("content-type") ?? "image/png";
+  // Fallback: Minimal 1x1 PNG asset so Sanity draft creation succeeds even when GitHub opengraph rate-limits
+  const fallbackPng = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+    "base64",
+  );
 
-  const imageBuffer = Buffer.from(await response.arrayBuffer());
-
-  const asset = await writeClient.assets.upload("image", imageBuffer, {
-    filename: `${title.toLowerCase().replace(/\s+/g, "-")}.png`,
-    contentType,
+  const fallbackAsset = await writeClient.assets.upload("image", fallbackPng, {
+    filename: `${title.toLowerCase().replace(/\s+/g, "-")}-placeholder.png`,
+    contentType: "image/png",
   });
 
   return {
     _type: "image",
     asset: {
       _type: "reference",
-      _ref: asset._id,
+      _ref: fallbackAsset._id,
     },
     alt: title,
   };

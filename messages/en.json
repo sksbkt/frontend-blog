@@ -140,7 +140,7 @@
             "emptyHint": "Try clearing your search query.",
             "noDescription": "No description provided.",
             "private": "Private",
-            "statusLive": "Live on Site",
+            "statusLive": "Live",
             "statusDraft": "Draft Pending",
             "analyze": "Analyze & Draft",
             "reGenerate": "Re-Generate",
@@ -186,5 +186,13 @@
         },
         "loadMore": "Load more repositories",
         "showing": "Showing {count} of {total} repositories"
+    },
+    "network": {
+        "offlineTitle": "You're Offline",
+        "offlineDesc": "Browsing cached content. Reconnecting automatically when online...",
+        "onlineTitle": "Back Online!",
+        "onlineDesc": "Connection restored. Updating latest content...",
+        "retry": "Check Connection",
+        "syncing": "Syncing..."
     }
 }

@@ -39,7 +39,7 @@ export async function GET(request: Request) {
 
   const authUrl = new URL("https://github.com/login/oauth/authorize");
   authUrl.searchParams.set("client_id", clientId);
-  authUrl.searchParams.set("scope", "repo,read:user");
+  authUrl.searchParams.set("scope", "repo,workflow,read:user");
   authUrl.searchParams.set("state", state);
 
   return NextResponse.redirect(authUrl.toString());

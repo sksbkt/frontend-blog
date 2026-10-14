@@ -22,3 +22,15 @@ const builder = createImageUrlBuilder(client);
 export function urlFor(source: SanityImageSource) {
   return builder.image(source);
 }
+
+export async function safeFetch<T>(
+  fetcher: () => Promise<T>,
+  fallbackValue: T
+): Promise<T> {
+  try {
+    return await fetcher();
+  } catch (error) {
+    console.warn("Sanity fetch failed (offline or network error):", error);
+    return fallbackValue;
+  }
+}

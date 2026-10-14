@@ -1,55 +1,58 @@
 import { NextResponse } from "next/server";
+import { GoogleGenAI } from "@google/genai";
 
 export async function GET() {
   try {
-    const response = await fetch(
-      "https://openrouter.ai/api/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "openrouter/free",
-          messages: [
-            {
-              role: "user",
-              content: "Reply with exactly: OpenRouter connection works.",
-            },
-          ],
-        }),
-      },
-    );
+    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error("OpenRouter error:", data);
-
+    if (!apiKey) {
       return NextResponse.json(
         {
           success: false,
-          message: "OpenRouter request failed.",
-          error: data,
+          message:
+            "GEMINI_API_KEY is not configured. Please set GEMINI_API_KEY in your environment variables.",
         },
-        { status: response.status },
+        { status: 500 },
       );
     }
 
-    return NextResponse.json({
-      success: true,
-      message: data.choices?.[0]?.message?.content ?? "No response.",
-    });
+    const ai = new GoogleGenAI({ apiKey });
+    const candidateModels = [
+      process.env.GEMINI_MODEL,
+      "gemini-3.5-flash-lite",
+      "gemini-3.8-flash",
+    ].filter((m): m is string => Boolean(m));
+
+    let lastError: unknown = null;
+
+    for (const model of candidateModels) {
+      try {
+        const response = await ai.models.generateContent({
+          model,
+          contents: "Reply with exactly: Gemini API connection works.",
+        });
+
+        return NextResponse.json({
+          success: true,
+          message: response.text?.trim() ?? "No response.",
+          model,
+        });
+      } catch (err) {
+        lastError = err;
+      }
+    }
+
+    throw lastError || new Error("Failed to connect to any Gemini model.");
   } catch (error) {
-    console.error("OpenRouter test error:", error);
+    console.error("Gemini test error:", error);
 
     return NextResponse.json(
       {
         success: false,
-        message: "OpenRouter request failed.",
+        message: "Gemini API request failed.",
+        error: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 },
+      { status: 502 },
     );
   }
 }

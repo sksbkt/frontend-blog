@@ -2,7 +2,7 @@ import { getTranslations } from "next-intl/server";
 
 import ArticleCard from "@/components/blog/article-card";
 import FeaturedPostsMotion from "@/components/home/featured-posts-motion";
-import { freshClient } from "@/lib/sanity/client";
+import { freshClient, safeFetch } from "@/lib/sanity/client";
 import { mapSanityPost } from "@/lib/sanity/mappers";
 
 const featuredPostsQuery = `*[
@@ -26,8 +26,10 @@ export const dynamic = "force-dynamic";
 export default async function FeaturedPosts() {
   const t = await getTranslations("blog");
 
-  const sanityPosts: Parameters<typeof mapSanityPost>[0][] =
-    await freshClient.fetch(featuredPostsQuery);
+  const sanityPosts: Parameters<typeof mapSanityPost>[0][] = await safeFetch(
+    () => freshClient.fetch(featuredPostsQuery),
+    []
+  );
 
   const featuredPosts = sanityPosts.map(mapSanityPost);
 

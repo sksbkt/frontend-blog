@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="50%" stop-color="#090d16"/>
+      <stop offset="100%" stop-color="#030712"/>
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="50%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#a855f7"/>
+    </linearGradient>
+    <linearGradient id="glowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#a855f7" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="24" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Background with subtle rounded corners for standard icon display -->
+  <rect width="512" height="512" rx="128" fill="url(#bgGrad)"/>
+  <rect width="508" height="508" x="2" y="2" rx="126" fill="none" stroke="url(#accentGrad)" stroke-width="3" stroke-opacity="0.3"/>
+
+  <!-- Ambient Glow behind symbol -->
+  <circle cx="256" cy="256" r="160" fill="url(#glowGrad)"/>
+
+  <!-- Stylized "A" Monogram / Code Bracket Emblem -->
+  <g filter="url(#glow)">
+    <!-- Left Leg of A with Code Bracket Angle -->
+    <path d="M 170 370 L 236 150 C 242 130 270 130 276 150 L 342 370 C 347 386 332 400 316 395 C 304 391 297 380 293 368 L 278 318 L 234 318 L 219 368 C 215 380 208 391 196 395 C 180 400 165 386 170 370 Z" fill="url(#accentGrad)"/>
+    
+    <!-- Crossbar / Inner Void -->
+    <polygon points="256,220 242,274 270,274" fill="#090d16"/>
+  </g>
+
+  <!-- Code Dots Accent -->
+  <circle cx="160" cy="256" r="12" fill="#38bdf8" opacity="0.8"/>
+  <circle cx="352" cy="256" r="12" fill="#a855f7" opacity="0.8"/>
+</svg>

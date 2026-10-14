@@ -2,7 +2,7 @@ import { getTranslations } from "next-intl/server";
 
 import ArticleCard from "@/components/blog/article-card";
 import Pagination from "@/components/shared/pagination";
-import { client } from "@/lib/sanity/client";
+import { client, safeFetch } from "@/lib/sanity/client";
 import { mapSanityPost } from "@/lib/sanity/mappers";
 import { postsQuery } from "@/lib/sanity/queries";
 
@@ -24,12 +24,13 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
   const start = (page - 1) * POSTS_PER_PAGE;
   const end = start + POSTS_PER_PAGE + 1;
 
-  const sanityPosts: Parameters<typeof mapSanityPost>[0][] = await client.fetch(
-    postsQuery,
-    {
-      start,
-      end,
-    },
+  const sanityPosts: Parameters<typeof mapSanityPost>[0][] = await safeFetch(
+    () =>
+      client.fetch(postsQuery, {
+        start,
+        end,
+      }),
+    []
   );
 
   const hasNextPage = sanityPosts.length > POSTS_PER_PAGE;

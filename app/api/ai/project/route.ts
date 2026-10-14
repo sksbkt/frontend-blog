@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { GoogleGenAI } from "@google/genai";
 
 import { createProjectDraft } from "@/lib/sanity/create-project-draft";
 
@@ -730,49 +731,6 @@ function parseAiJson(content: string): ProjectOutput {
   };
 }
 
-function extractAiContent(data: unknown) {
-  const response = data as {
-    choices?: Array<{
-      message?: {
-        content?: unknown;
-      };
-    }>;
-  };
-
-  const content = response.choices?.[0]?.message?.content;
-
-  if (typeof content === "string") {
-    return content;
-  }
-
-  if (Array.isArray(content)) {
-    return content
-      .map((item) => {
-        if (
-          item &&
-          typeof item === "object" &&
-          "text" in item &&
-          typeof item.text === "string"
-        ) {
-          return item.text;
-        }
-
-        return "";
-      })
-      .join("");
-  }
-
-  throw new Error("OpenRouter returned an unsupported response.");
-}
-
-function isNonJsonSafetyResponse(content: string) {
-  const normalized = content.trim().toLowerCase();
-
-  return (
-    normalized === "user safety: safe" || normalized.startsWith("user safety:")
-  );
-}
-
 const systemPrompt = `
 You generate portfolio project content from GitHub repository evidence.
 
@@ -987,59 +945,64 @@ Before returning JSON:
 9. Return JSON only.
 `.trim();
 
-async function requestOpenRouter(
-  model: string,
+async function requestGemini(
   repository: unknown,
   readme: string,
   packageJson: unknown,
-) {
-  const response = await fetch(
-    "https://openrouter.ai/api/v1/chat/completions",
-    {
-      method: "POST",
+): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
 
-      headers: {
-        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-
-      body: JSON.stringify({
-        model,
-
-        response_format: {
-          type: "json_object",
-        },
-
-        messages: [
-          {
-            role: "system",
-            content: systemPrompt,
-          },
-
-          {
-            role: "user",
-            content: JSON.stringify({
-              repository,
-              readme,
-              packageJson,
-            }),
-          },
-        ],
-      }),
-    },
-  );
-
-  const data = await response.json();
-
-  if (!response.ok) {
+  if (!apiKey) {
     throw new Error(
-      `OpenRouter request failed with status ${response.status}: ${JSON.stringify(
-        data,
-      )}`,
+      "Gemini API key is not configured. Set GEMINI_API_KEY in your environment variables.",
     );
   }
 
-  return extractAiContent(data);
+  const ai = new GoogleGenAI({ apiKey });
+  const candidateModels = [
+    process.env.GEMINI_MODEL,
+    "gemini-3.5-flash-lite",
+    "gemini-3.8-flash",
+  ].filter((m): m is string => Boolean(m));
+
+  let lastError: unknown = null;
+
+  for (const model of candidateModels) {
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                text: JSON.stringify({
+                  repository,
+                  readme,
+                  packageJson,
+                }),
+              },
+            ],
+          },
+        ],
+        config: {
+          systemInstruction: systemPrompt,
+          responseMimeType: "application/json",
+          temperature: 0.2,
+        },
+      });
+
+      const text = response.text;
+      if (text) {
+        return text;
+      }
+    } catch (err) {
+      console.warn(`Gemini generation with model ${model} failed, trying next candidate:`, err);
+      lastError = err;
+    }
+  }
+
+  throw lastError || new Error("Gemini returned an empty response.");
 }
 
 export async function POST(request: Request) {
@@ -1075,75 +1038,18 @@ export async function POST(request: Request) {
     let aiContent: string;
 
     try {
-      aiContent = await requestOpenRouter(
-        "openrouter/free",
-        repository,
-        readme,
-        packageJson,
-      );
+      aiContent = await requestGemini(repository, readme, packageJson);
     } catch (error) {
-      console.error("OpenRouter first attempt failed:", error);
+      console.error("Gemini AI generation failed:", error);
 
       return NextResponse.json(
         {
           success: false,
-          message: "OpenRouter request failed.",
+          message: "Gemini AI generation request failed.",
           error:
             error instanceof Error
               ? error.message
-              : "Unknown OpenRouter error.",
-        },
-        {
-          status: 502,
-        },
-      );
-    }
-
-    if (isNonJsonSafetyResponse(aiContent)) {
-      console.warn(
-        "OpenRouter free router returned a non-JSON safety response. Retrying with a structured-output free model.",
-      );
-
-      try {
-        aiContent = await requestOpenRouter(
-          "google/gemma-4-26b-a4b-it:free",
-          repository,
-          readme,
-          packageJson,
-        );
-      } catch (error) {
-        console.error("OpenRouter fallback attempt failed:", error);
-
-        return NextResponse.json(
-          {
-            success: false,
-            message:
-              "OpenRouter returned a non-JSON response and the fallback model failed.",
-            error:
-              error instanceof Error
-                ? error.message
-                : "Unknown fallback error.",
-            rawContent: aiContent,
-          },
-          {
-            status: 502,
-          },
-        );
-      }
-    }
-
-    if (isNonJsonSafetyResponse(aiContent)) {
-      console.error(
-        "OpenRouter returned a non-JSON safety response:",
-        aiContent,
-      );
-
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "OpenRouter returned a safety/status message instead of project JSON.",
-          rawContent: aiContent,
+              : "Unknown Gemini generation error.",
         },
         {
           status: 502,
