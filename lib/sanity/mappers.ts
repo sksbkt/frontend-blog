@@ -287,17 +287,35 @@ export function mapSanityProject(project: SanityProject): Project {
   // Cover image precedence: coverImage -> image -> openGraphImage fallback
   let resolvedCoverImage = "";
   if (project.coverImage) {
-    try {
-      resolvedCoverImage = urlFor(project.coverImage).width(1200).url();
-    } catch {
-      resolvedCoverImage = "";
+    const rawAsset = (project.coverImage as { asset?: { url?: string; _ref?: string } })?.asset;
+    if (typeof rawAsset?.url === "string") {
+      resolvedCoverImage = rawAsset.url;
+    } else if (typeof (project.coverImage as { url?: string })?.url === "string") {
+      resolvedCoverImage = (project.coverImage as { url: string }).url;
+    } else if (typeof project.coverImage === "string") {
+      resolvedCoverImage = project.coverImage;
+    } else {
+      try {
+        resolvedCoverImage = urlFor(project.coverImage).width(1200).url();
+      } catch {
+        resolvedCoverImage = "";
+      }
     }
   }
   if (!resolvedCoverImage && project.image) {
-    try {
-      resolvedCoverImage = urlFor(project.image).width(1200).url();
-    } catch {
-      resolvedCoverImage = "";
+    const rawAsset = (project.image as { asset?: { url?: string; _ref?: string } })?.asset;
+    if (typeof rawAsset?.url === "string") {
+      resolvedCoverImage = rawAsset.url;
+    } else if (typeof (project.image as { url?: string })?.url === "string") {
+      resolvedCoverImage = (project.image as { url: string }).url;
+    } else if (typeof project.image === "string") {
+      resolvedCoverImage = project.image;
+    } else {
+      try {
+        resolvedCoverImage = urlFor(project.image).width(1200).url();
+      } catch {
+        resolvedCoverImage = "";
+      }
     }
   }
   if (!resolvedCoverImage && openGraphImage) {
@@ -309,7 +327,15 @@ export function mapSanityProject(project: SanityProject): Project {
     .map((item) => {
       try {
         if (!item.asset) return null;
-        const url = urlFor(item.asset).width(1200).url();
+        let url = "";
+        const rawAsset = item.asset as { url?: string };
+        if (typeof rawAsset?.url === "string") {
+          url = rawAsset.url;
+        } else if (typeof item.asset === "string") {
+          url = item.asset;
+        } else {
+          url = urlFor(item.asset).width(1200).url();
+        }
         return {
           _key: item._key,
           url,
@@ -325,10 +351,15 @@ export function mapSanityProject(project: SanityProject): Project {
   // Map video & gif safely
   let previewGifUrl: string | undefined;
   if (project.previewGif?.asset) {
-    try {
-      previewGifUrl = urlFor(project.previewGif.asset).url();
-    } catch {
-      previewGifUrl = undefined;
+    const rawAsset = project.previewGif.asset as { url?: string };
+    if (typeof rawAsset?.url === "string") {
+      previewGifUrl = rawAsset.url;
+    } else {
+      try {
+        previewGifUrl = urlFor(project.previewGif.asset).url();
+      } catch {
+        previewGifUrl = undefined;
+      }
     }
   }
 

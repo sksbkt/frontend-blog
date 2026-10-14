@@ -26,35 +26,49 @@ export async function GET() {
         demo,
         featured,
         content,
-        image,
+        "image": select(
+          defined(image.asset->url) => { "_id": image.asset->_id, "url": image.asset->url, "_ref": image.asset->_id },
+          defined(image.asset.url) => { "_id": image.asset._id, "url": image.asset.url, "_ref": image.asset._ref },
+          null
+        ),
         coverImage{
-          ...,
-          asset->{
-            _id,
-            url
-          }
+          alt,
+          _type,
+          "asset": select(
+            defined(asset->url) => { "_id": asset->_id, "url": asset->url, "_ref": asset->_id },
+            defined(asset.url) => { "_id": asset._id, "url": asset.url, "_ref": asset._ref },
+            null
+          )
         },
         gallery[]{
-          ...,
-          asset->{
-            _id,
-            url
-          }
+          alt,
+          caption,
+          _key,
+          _type,
+          "asset": select(
+            defined(asset->url) => { "_id": asset->_id, "url": asset->url, "_ref": asset->_id },
+            defined(asset.url) => { "_id": asset._id, "url": asset.url, "_ref": asset._ref },
+            null
+          )
         },
         video{
           enabled,
           url,
-          asset->{
-            _id,
-            url
-          }
+          "asset": select(
+            defined(asset->url) => { "_id": asset->_id, "url": asset->url },
+            defined(asset.url) => { "_id": asset._id, "url": asset.url },
+            null
+          )
         },
         previewGif{
-          ...,
-          asset->{
-            _id,
-            url
-          }
+          enabled,
+          alt,
+          _type,
+          "asset": select(
+            defined(asset->url) => { "_id": asset->_id, "url": asset->url, "_ref": asset->_id },
+            defined(asset.url) => { "_id": asset._id, "url": asset.url, "_ref": asset._ref },
+            null
+          )
         },
         "isDraft": _id in path("drafts.**")
       }`,
@@ -222,10 +236,108 @@ export async function PATCH(request: Request) {
       if (field in data) {
         if (field === "slug" && typeof data.slug === "string") {
           patchData.slug = { _type: "slug", current: data.slug };
+        } else if (field === "coverImage") {
+          // Handled specially below
+        } else if (field === "gallery") {
+          // Handled specially below
+        } else if (field === "previewGif") {
+          // Handled specially below
         } else {
           patchData[field] = data[field];
         }
       }
+    }
+
+    // Process coverImage and sync with legacy image field
+    if ("coverImage" in data && data.coverImage) {
+      let finalAssetRef = data.coverImage.asset?._id || data.coverImage.asset?._ref;
+      const targetUrl = data.coverImage.asset?.url;
+
+      // If we only have an external URL (e.g. GitHub OpenGraph), upload it directly to Sanity Assets pipeline
+      if (!finalAssetRef && targetUrl && /^https?:\/\//i.test(targetUrl)) {
+        try {
+          const imgRes = await fetch(targetUrl, {
+            headers: {
+              "User-Agent": "Mozilla/5.0 (compatible; PortfolioAdmin/1.0)",
+            },
+          });
+          if (imgRes.ok) {
+            const buffer = Buffer.from(await imgRes.arrayBuffer());
+            const uploaded = await writeClient.assets.upload("image", buffer, {
+              filename: `cover-${id.replace(/[^a-zA-Z0-9_-]/g, "")}.png`,
+            });
+            if (uploaded?._id) {
+              finalAssetRef = uploaded._id;
+            }
+          }
+        } catch (uploadErr) {
+          console.warn("[Admin PATCH] Warning uploading external cover image to Sanity:", uploadErr);
+        }
+      }
+
+      if (finalAssetRef) {
+        patchData.coverImage = {
+          _type: "image",
+          alt: data.coverImage.alt || "Cover Image",
+          asset: {
+            _type: "reference",
+            _ref: finalAssetRef,
+          },
+        };
+        // Also update legacy image field so any component querying 'image' immediately reflects the change
+        patchData.image = {
+          _type: "image",
+          alt: data.coverImage.alt || "Cover Image",
+          asset: {
+            _type: "reference",
+            _ref: finalAssetRef,
+          },
+        };
+      } else {
+        patchData.coverImage = data.coverImage;
+      }
+    }
+
+    // Process gallery items
+    if ("gallery" in data && Array.isArray(data.gallery)) {
+      patchData.gallery = data.gallery.map((item: any, idx: number) => {
+        const assetRef = item.asset?._id || item.asset?._ref;
+        return {
+          _key: item._key || `gallery-${Date.now()}-${idx}`,
+          _type: "galleryImage",
+          caption: item.caption || "",
+          alt: item.alt || item.caption || "Gallery Image",
+          ...(assetRef
+            ? {
+                asset: {
+                  _type: "reference",
+                  _ref: assetRef,
+                },
+              }
+            : item.asset
+            ? { asset: item.asset }
+            : {}),
+        };
+      });
+    }
+
+    // Process previewGif
+    if ("previewGif" in data && data.previewGif) {
+      const assetRef = data.previewGif.asset?._id || data.previewGif.asset?._ref;
+      patchData.previewGif = {
+        _type: "image",
+        enabled: data.previewGif.enabled !== false,
+        ...(assetRef
+          ? {
+              asset: {
+                _type: "reference",
+                _ref: assetRef,
+              },
+            }
+          : data.previewGif.asset
+          ? { asset: data.previewGif.asset }
+          : {}),
+      };
     }
 
     await patch.set(patchData).commit();
@@ -233,6 +345,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({
       success: true,
       message: "Project updated successfully.",
+      coverImage: patchData.coverImage,
     });
   } catch (error) {
     console.error("Admin patch project error:", error);

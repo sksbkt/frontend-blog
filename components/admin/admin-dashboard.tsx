@@ -1696,19 +1696,39 @@ export default function AdminDashboard({ initialSession, locale }: AdminDashboar
                   className="bg-neutral-900/80 border border-amber-500/30 rounded-2xl p-6 shadow-xl relative overflow-hidden"
                 >
                   <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6 mb-6">
-                    <div className="space-y-2 flex-1 min-w-0">
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <h3 className="text-xl font-bold text-white">{draft.title.en}</h3>
-                        <span className="text-neutral-500 text-sm font-mono">/</span>
-                        <h4 className="text-lg font-medium text-neutral-300" dir="rtl">
-                          {draft.title.fa}
-                        </h4>
-                      </div>
+                    <div className="flex flex-col sm:flex-row items-start gap-4 flex-1 min-w-0">
+                      {(() => {
+                        const coverUrl = draft.coverImage?.asset?.url || draft.image?.asset?.url || getGitHubOpenGraphUrl(draft.github);
+                        if (!coverUrl) return null;
+                        return (
+                          <div className="relative w-full sm:w-40 h-28 sm:h-24 rounded-xl overflow-hidden border border-neutral-800 bg-neutral-950 shrink-0">
+                            <img
+                              src={coverUrl}
+                              alt={draft.title.en}
+                              referrerPolicy="no-referrer"
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute top-1.5 left-1.5 bg-neutral-900/80 backdrop-blur-sm text-[10px] font-mono text-neutral-300 px-1.5 py-0.5 rounded border border-neutral-700/80">
+                              Cover
+                            </div>
+                          </div>
+                        );
+                      })()}
 
-                      <div className="flex items-center gap-3 text-xs text-neutral-400 flex-wrap">
-                        <span className="font-mono bg-neutral-800 px-2 py-0.5 rounded text-neutral-300">
-                          slug: {draft.slug.current}
-                        </span>
+                      <div className="space-y-2 flex-1 min-w-0">
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <h3 className="text-xl font-bold text-white">{draft.title.en}</h3>
+                          <span className="text-neutral-500 text-sm font-mono">/</span>
+                          <h4 className="text-lg font-medium text-neutral-300" dir="rtl">
+                            {draft.title.fa}
+                          </h4>
+                        </div>
+
+                        <div className="flex items-center gap-3 text-xs text-neutral-400 flex-wrap">
+                          <span className="font-mono bg-neutral-800 px-2 py-0.5 rounded text-neutral-300">
+                            slug: {draft.slug.current}
+                          </span>
+                        </div>
                       </div>
                     </div>
 
@@ -2023,49 +2043,68 @@ export default function AdminDashboard({ initialSession, locale }: AdminDashboar
                   key={proj._id}
                   className="bg-neutral-900/70 border border-neutral-800 rounded-2xl p-6 shadow-md flex flex-col lg:flex-row lg:items-center justify-between gap-6"
                 >
-                  <div className="space-y-2 flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-3 mb-1">
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <h3 className="text-xl font-bold text-white">{proj.title.en}</h3>
-                        <span className="text-neutral-500 text-sm font-mono">/</span>
-                        <h4 className="text-lg font-medium text-neutral-300" dir="rtl">
-                          {proj.title.fa}
-                        </h4>
-                      </div>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 flex-1 min-w-0">
+                    {(() => {
+                      const coverUrl = proj.coverImage?.asset?.url || proj.image?.asset?.url || getGitHubOpenGraphUrl(proj.github);
+                      if (!coverUrl) return null;
+                      return (
+                        <div className="relative w-full sm:w-40 h-28 sm:h-24 rounded-xl overflow-hidden border border-neutral-800 bg-neutral-950 shrink-0">
+                          <img
+                            src={coverUrl}
+                            alt={proj.title.en}
+                            referrerPolicy="no-referrer"
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute top-1.5 left-1.5 bg-neutral-900/80 backdrop-blur-sm text-[10px] font-mono text-neutral-300 px-1.5 py-0.5 rounded border border-neutral-700/80">
+                            Cover
+                          </div>
+                        </div>
+                      );
+                    })()}
 
-                      <div className="flex items-center gap-2 shrink-0">
-                        {/* Header Status Badge */}
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-semibold">
-                          <span className="relative flex h-2 w-2 shrink-0 items-center justify-center">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    <div className="space-y-2 flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-3 mb-1">
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <h3 className="text-xl font-bold text-white">{proj.title.en}</h3>
+                          <span className="text-neutral-500 text-sm font-mono">/</span>
+                          <h4 className="text-lg font-medium text-neutral-300" dir="rtl">
+                            {proj.title.fa}
+                          </h4>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          {/* Header Status Badge */}
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-semibold">
+                            <span className="relative flex h-2 w-2 shrink-0 items-center justify-center">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                            </span>
+                            <span>Deployed</span>
                           </span>
-                          <span>Deployed</span>
-                        </span>
 
-                        {/* Crisp External Links */}
-                        {proj.github && (
+                          {/* Crisp External Links */}
+                          {proj.github && (
+                            <a
+                              href={proj.github}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="p-2 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded-xl transition-colors border border-neutral-800"
+                              title="View GitHub repository"
+                            >
+                              <Github className="w-4 h-4" />
+                            </a>
+                          )}
                           <a
-                            href={proj.github}
+                            href={`/${locale}/projects/${proj.slug.current}`}
                             target="_blank"
                             rel="noreferrer"
-                            className="p-2 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded-xl transition-colors border border-neutral-800"
-                            title="View GitHub repository"
+                            className="p-2 text-neutral-400 hover:text-emerald-400 hover:bg-neutral-800 rounded-xl transition-colors border border-neutral-800"
+                            title="Open live project on portfolio"
                           >
-                            <Github className="w-4 h-4" />
+                            <ExternalLink className="w-4 h-4" />
                           </a>
-                        )}
-                        <a
-                          href={`/${locale}/projects/${proj.slug.current}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="p-2 text-neutral-400 hover:text-emerald-400 hover:bg-neutral-800 rounded-xl transition-colors border border-neutral-800"
-                          title="Open live project on portfolio"
-                        >
-                          <ExternalLink className="w-4 h-4" />
-                        </a>
+                        </div>
                       </div>
-                    </div>
 
                     <p className="text-sm text-neutral-400 max-w-2xl line-clamp-2">
                       {proj.description.en}
@@ -2082,6 +2121,7 @@ export default function AdminDashboard({ initialSession, locale }: AdminDashboar
                       ))}
                     </div>
                   </div>
+                </div>
 
                   {/* Actions Bar: Deduplicated, Clear Visual Hierarchy */}
                   <div className="flex items-center gap-2 flex-wrap sm:shrink-0 justify-end pt-4 lg:pt-0 border-t lg:border-t-0 border-neutral-800/80">
