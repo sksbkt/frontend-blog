@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
+import { geminiQueue } from "@/lib/gemini/queue";
 
 import { createProjectDraft } from "@/lib/sanity/create-project-draft";
 
@@ -969,28 +970,30 @@ async function requestGemini(
 
   for (const model of candidateModels) {
     try {
-      const response = await ai.models.generateContent({
-        model,
-        contents: [
-          {
-            role: "user",
-            parts: [
-              {
-                text: JSON.stringify({
-                  repository,
-                  readme,
-                  packageJson,
-                }),
-              },
-            ],
+      const response = await geminiQueue.run(async () =>
+        ai.models.generateContent({
+          model,
+          contents: [
+            {
+              role: "user",
+              parts: [
+                {
+                  text: JSON.stringify({
+                    repository,
+                    readme,
+                    packageJson,
+                  }),
+                },
+              ],
+            },
+          ],
+          config: {
+            systemInstruction: systemPrompt,
+            responseMimeType: "application/json",
+            temperature: 0.2,
           },
-        ],
-        config: {
-          systemInstruction: systemPrompt,
-          responseMimeType: "application/json",
-          temperature: 0.2,
-        },
-      });
+        })
+      );
 
       const text = response.text;
       if (text) {

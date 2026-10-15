@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { RepoContext } from "@/lib/github/repo-inspector";
+import { geminiQueue } from "@/lib/gemini/queue";
 
 export type EnvVariableDef = {
   key: string;
@@ -118,24 +119,26 @@ export async function generateRepoAudit(
 
   for (const model of candidateModels) {
     try {
-      const response = await ai.models.generateContent({
-        model,
-        contents: [
-          {
-            role: "user",
-            parts: [
-              {
-                text: JSON.stringify(promptInput),
-              },
-            ],
+      const response = await geminiQueue.run(async () =>
+        ai.models.generateContent({
+          model,
+          contents: [
+            {
+              role: "user",
+              parts: [
+                {
+                  text: JSON.stringify(promptInput),
+                },
+              ],
+            },
+          ],
+          config: {
+            systemInstruction: auditSystemPrompt,
+            responseMimeType: "application/json",
+            temperature: 0.2,
           },
-        ],
-        config: {
-          systemInstruction: auditSystemPrompt,
-          responseMimeType: "application/json",
-          temperature: 0.2,
-        },
-      });
+        })
+      );
 
       const text = response.text;
       if (text) {

@@ -2,7 +2,7 @@ import { getTranslations } from "next-intl/server";
 
 import FeaturedProjectsMotion from "@/components/projects/featured-projects-motion";
 import ProjectCard from "@/components/projects/project-card";
-import { freshClient, safeFetch } from "@/lib/sanity/client";
+import { client, safeFetch } from "@/lib/sanity/client";
 import { mapSanityProject } from "@/lib/sanity/mappers";
 
 const featuredProjectsQuery = `*[
@@ -25,13 +25,21 @@ const featuredProjectsQuery = `*[
   content
 }`;
 
-export const dynamic = "force-dynamic";
-
 export default async function FeaturedProjects() {
   const t = await getTranslations("projects");
 
   const sanityProjects: Parameters<typeof mapSanityProject>[0][] = await safeFetch(
-    () => freshClient.fetch(featuredProjectsQuery),
+    () =>
+      client.fetch(
+        featuredProjectsQuery,
+        {},
+        {
+          next: {
+            tags: ["projects"],
+            revalidate: false,
+          },
+        }
+      ),
     []
   );
 

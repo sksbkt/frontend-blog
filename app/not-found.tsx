@@ -1,5 +1,7 @@
 import StatusPageCard from "@/components/shared/status-page-card";
 
+export const dynamic = "force-dynamic";
+
 export default function RootNotFound() {
   return (
     <html lang="en">

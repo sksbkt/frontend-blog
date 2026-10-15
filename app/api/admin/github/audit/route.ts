@@ -15,7 +15,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { fullName } = body;
+    const { fullName, forceRefresh } = body;
 
     if (!fullName || typeof fullName !== "string" || !fullName.includes("/")) {
       return NextResponse.json(
@@ -24,8 +24,10 @@ export async function POST(request: Request) {
       );
     }
 
-    // 1. Inspect repository context
-    const context = await inspectRepository(fullName, session.accessToken);
+    // 1. Inspect repository context (with optional cache bypass)
+    const context = await inspectRepository(fullName, session.accessToken, {
+      forceRefresh: Boolean(forceRefresh),
+    });
 
     // 2. Generate audit report & bilingual README draft
     const audit = await generateRepoAudit(context);

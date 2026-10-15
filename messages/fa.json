@@ -132,6 +132,49 @@
             "drafts": "پیش‌نویس‌ها برای بررسی",
             "published": "پروژه‌های منتشرشده"
         },
+        "masterDetail": {
+            "backToRepos": "بازگشت به مخازن",
+            "selectRepoPlaceholder": "یک مخزن را برای بررسی و مدیریت انتخاب کنید",
+            "selectRepoHint": "یک مخزن را از لیست انتخاب کنید تا تحلیل معماری، استقرار در ورسل، یا ثبت تصاویر را مشاهده کنید.",
+            "viewMode": {
+                "split": "نمای جزئیات",
+                "grid": "نمای شبکه‌ای"
+            },
+            "filters": {
+                "all": "همه",
+                "synced": "همگام با سنیتی",
+                "missingReadme": "بدون README",
+                "hasLiveDemo": "دموی زنده"
+            },
+            "tabs": {
+                "overview": "نمای کلی و وضعیت",
+                "audit": "تحلیل و README",
+                "deployment": "ورسل و استقرار",
+                "gallery": "رسانه"
+            },
+            "actions": {
+                "quickAudit": "تحلیل هوشمند",
+                "quickDeploy": "استقرار در ورسل",
+                "quickCapture": "ثبت دارایی‌های بصری",
+                "quickGenerate": "اسکن عمیق مخزن",
+                "reGenerate": "اسکن مجدد عمیق",
+                "moreActions": "عملیات بیشتر",
+                "directCommit": "کامیت به شاخه اصلی",
+                "createPr": "ایجاد پول‌ریکوئست",
+                "syncAssets": "همگام‌سازی با سنیتی",
+                "editProject": "ویرایش در سنیتی",
+                "publish": "تأیید و انتشار",
+                "copyReadme": "کپی README",
+                "copied": "کپی شد!"
+            },
+            "status": {
+                "deployed": "منتشر شده",
+                "draft": "پیش‌نویس",
+                "notImported": "ایمپورت نشده",
+                "inCiCapture": "در حال ضبط CI",
+                "awaitingConfig": "نیازمند تنظیمات"
+            }
+        },
         "repos": {
             "searchPlaceholder": "جستجو بر اساس نام یا فناوری...",
             "refresh": "به‌روزرسانی مخازن‌ها",

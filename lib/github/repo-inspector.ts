@@ -65,16 +65,59 @@ export type RepoContext = {
   };
 };
 
-async function ghFetch<T>(url: string, token: string): Promise<T | null> {
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/vnd.github+json",
-      "X-GitHub-Api-Version": "2022-11-28",
-      "User-Agent": "Portfolio-Admin-CMS",
-    },
-    cache: "no-store",
-  });
+export interface GitHubFetchOptions {
+  forceRefresh?: boolean;
+  revalidate?: number;
+  tags?: string[];
+}
+
+interface ETagCacheEntry<T = unknown> {
+  etag: string;
+  data: T;
+  timestamp: number;
+}
+
+// In-memory cache map for ETags and 304 Not Modified responses
+const gitHubETagCache = new Map<string, ETagCacheEntry>();
+
+export async function ghFetch<T>(
+  url: string,
+  token?: string,
+  options?: GitHubFetchOptions,
+): Promise<T | null> {
+  const authToken = token || process.env.GITHUB_TOKEN;
+  const headers: Record<string, string> = {
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+    "User-Agent": "Portfolio-Admin-CMS",
+  };
+
+  if (authToken) {
+    headers.Authorization = `Bearer ${authToken}`;
+  }
+
+  const cached = gitHubETagCache.get(url);
+  if (cached?.etag && !options?.forceRefresh) {
+    headers["If-None-Match"] = cached.etag;
+  }
+
+  const fetchInit: RequestInit = {
+    headers,
+    ...(options?.forceRefresh
+      ? { cache: "no-store" }
+      : {
+          next: {
+            revalidate: options?.revalidate ?? 3600,
+            tags: options?.tags ?? ["github-repo"],
+          },
+        }),
+  };
+
+  const response = await fetch(url, fetchInit);
+
+  if (response.status === 304 && cached) {
+    return cached.data as T;
+  }
 
   if (response.status === 404) {
     return null;
@@ -84,7 +127,17 @@ async function ghFetch<T>(url: string, token: string): Promise<T | null> {
     throw new Error(`GitHub request failed [${response.status}]: ${url}`);
   }
 
-  return response.json() as Promise<T>;
+  const data = (await response.json()) as T;
+  const etag = response.headers.get("etag");
+  if (etag) {
+    gitHubETagCache.set(url, {
+      etag,
+      data,
+      timestamp: Date.now(),
+    });
+  }
+
+  return data;
 }
 
 /**
@@ -93,12 +146,14 @@ async function ghFetch<T>(url: string, token: string): Promise<T | null> {
 export async function inspectReadme(
   owner: string,
   repo: string,
-  token: string,
+  token?: string,
+  options?: GitHubFetchOptions,
 ): Promise<{ exists: boolean; content: string; size: number }> {
   try {
     const data = await ghFetch<GitHubFileResponse>(
       `https://api.github.com/repos/${owner}/${repo}/readme`,
       token,
+      options,
     );
 
     if (!data || !data.content) {
@@ -127,12 +182,14 @@ export async function inspectReadme(
 export async function inspectPackageJson(
   owner: string,
   repo: string,
-  token: string,
+  token?: string,
+  options?: GitHubFetchOptions,
 ): Promise<Record<string, unknown> | null> {
   try {
     const data = await ghFetch<GitHubFileResponse>(
       `https://api.github.com/repos/${owner}/${repo}/contents/package.json`,
       token,
+      options,
     );
 
     if (!data || !data.content) {
@@ -158,7 +215,8 @@ export async function inspectFileTree(
   owner: string,
   repo: string,
   defaultBranch: string,
-  token: string,
+  token?: string,
+  options?: GitHubFetchOptions,
 ): Promise<{
   totalFiles: number;
   topLevelFiles: string[];
@@ -170,6 +228,7 @@ export async function inspectFileTree(
     const treeData = await ghFetch<GitHubTreeResponse>(
       `https://api.github.com/repos/${owner}/${repo}/git/trees/${defaultBranch}?recursive=1`,
       token,
+      options,
     );
 
     if (!treeData || !Array.isArray(treeData.tree)) {
@@ -280,7 +339,8 @@ export async function inspectEntryPoint(
   repo: string,
   allPaths: string[],
   packageJson: Record<string, unknown> | null,
-  token: string,
+  token?: string,
+  options?: GitHubFetchOptions,
 ): Promise<{ path: string | null; snippet: string | null }> {
   // Candidate entry points in order of priority
   const candidates: string[] = [];
@@ -318,6 +378,7 @@ export async function inspectEntryPoint(
     const fileData = await ghFetch<GitHubFileResponse>(
       `https://api.github.com/repos/${owner}/${repo}/contents/${matchedPath}`,
       token,
+      options,
     );
 
     if (!fileData || !fileData.content) {
@@ -341,8 +402,6 @@ export async function inspectEntryPoint(
   }
 }
 
-
-
 /**
  * 5. Inspect repository files for environment variable references
  */
@@ -351,7 +410,8 @@ export async function inspectEnvVars(
   repo: string,
   allPaths: string[],
   entrySnippet: string | null,
-  token: string,
+  token?: string,
+  options?: GitHubFetchOptions,
 ): Promise<string[]> {
   const foundKeys = new Set<string>();
 
@@ -389,6 +449,7 @@ export async function inspectEnvVars(
         const fileData = await ghFetch<GitHubFileResponse>(
           `https://api.github.com/repos/${owner}/${repo}/contents/${filePath}`,
           token,
+          options,
         );
         if (fileData?.content) {
           const decoded = Buffer.from(
@@ -410,7 +471,8 @@ export async function inspectEnvVars(
  */
 export async function inspectRepository(
   fullName: string,
-  token: string,
+  token?: string,
+  options?: GitHubFetchOptions,
 ): Promise<RepoContext> {
   const [owner, repo] = fullName.split("/");
   const apiBase = `https://api.github.com/repos/${owner}/${repo}`;
@@ -429,7 +491,7 @@ export async function inspectRepository(
     private: boolean;
   };
 
-  const repoDetails = await ghFetch<GHRepoRaw>(apiBase, token);
+  const repoDetails = await ghFetch<GHRepoRaw>(apiBase, token, options);
 
   if (!repoDetails) {
     throw new Error(`Repository ${fullName} not found or inaccessible with provided token.`);
@@ -439,9 +501,9 @@ export async function inspectRepository(
 
   // Run inspections in parallel
   const [readmeResult, pkgResult, treeResult] = await Promise.all([
-    inspectReadme(owner, repo, token),
-    inspectPackageJson(owner, repo, token),
-    inspectFileTree(owner, repo, defaultBranch, token),
+    inspectReadme(owner, repo, token, options),
+    inspectPackageJson(owner, repo, token, options),
+    inspectFileTree(owner, repo, defaultBranch, token, options),
   ]);
 
   const entryPointResult = await inspectEntryPoint(
@@ -450,6 +512,7 @@ export async function inspectRepository(
     treeResult.allPaths,
     pkgResult,
     token,
+    options,
   );
 
   const detectedEnvKeys = await inspectEnvVars(
@@ -458,6 +521,7 @@ export async function inspectRepository(
     treeResult.allPaths,
     entryPointResult.snippet,
     token,
+    options,
   );
 
   return {

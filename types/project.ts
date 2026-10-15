@@ -1,3 +1,5 @@
+import type { ProjectLanguageItem } from "@/lib/github/languages";
+
 export type LocalizedText = {
   en: string;
   fa: string;
@@ -43,5 +45,8 @@ export type Project = {
   demo?: string;
   featured: boolean;
   content: ProjectContent;
+  rawLanguages?: Record<string, number> | string;
+  languages?: ProjectLanguageItem[];
 };
+
 

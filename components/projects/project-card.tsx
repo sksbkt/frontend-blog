@@ -6,6 +6,9 @@ import { useLocale, useTranslations } from "next-intl";
 
 import { Link } from "@/i18n/navigation";
 import type { Project } from "@/types/project";
+import { TechBadgeGroup } from "@/components/ui/tech-badge-group";
+import { LanguageBar } from "@/components/ui/language-bar";
+import { CustomTooltip } from "@/components/ui/custom-tooltip";
 
 type ProjectCardProps = {
   project: Project;
@@ -24,104 +27,96 @@ export default function ProjectCard({
   const language = locale === "fa" ? "fa" : "en";
 
   return (
-    <article className="group relative overflow-hidden rounded-xl border bg-card transition-shadow duration-300 hover:shadow-lg">
+    <article className="group relative flex flex-col h-full justify-between overflow-hidden rounded-2xl border bg-card transition-all duration-300 hover:shadow-xl hover:border-primary/30">
+      {/* Top Banner / Cover Image */}
       <Link
         href={`/projects/${project.slug}`}
-        className="block"
+        className="relative block h-56 w-full overflow-hidden shrink-0"
       >
-        <div className="relative h-56 overflow-hidden">
-          <div className="absolute inset-0 overflow-hidden">
-            <Image
-              src={project.image}
-              alt={project.title[language]}
-              fill
-              sizes="(max-width: 768px) 100vw, 50vw"
-              className="scale-[1.01] object-cover transition-transform duration-500 ease-out group-hover:scale-105"
-            />
-          </div>
-
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-card via-card/60 to-transparent" />
+        <div className="absolute inset-0 overflow-hidden">
+          <Image
+            src={project.image}
+            alt={project.title[language]}
+            fill
+            sizes="(max-width: 768px) 100vw, 50vw"
+            className="scale-[1.01] object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+          />
         </div>
 
-        <div className="-mt-8 relative z-10 p-6 pb-2">
-          <h3 className="text-xl font-semibold transition-colors group-hover:text-primary">
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-card via-card/60 to-transparent" />
+      </Link>
+
+      {/* Middle Content Body */}
+      <div className="relative z-10 flex flex-col flex-1 p-6 pb-3">
+        {/* Title and Description - Flexible Height */}
+        <Link href={`/projects/${project.slug}`} className="block flex-1 group/title">
+          <h3 className="text-xl font-semibold transition-colors group-hover/title:text-primary">
             {project.title[language]}
           </h3>
 
-          <p className="mt-3 leading-7 text-muted-foreground">
+          <p className="mt-2.5 text-sm leading-6 text-muted-foreground line-clamp-2 min-h-[40px]">
             {project.description[language]}
           </p>
-        </div>
-      </Link>
+        </Link>
 
-      <div className="relative z-10 px-6 pb-2">
-        <div className="flex flex-wrap gap-2">
-          {project.technologies.map((technology) => {
-            const isActive = activeTechnologies.includes(technology);
+        {/* Technical Metadata Section - Strictly Aligned */}
+        <div className="pt-4 mt-auto space-y-2.5">
+          <div className="min-h-[28px] flex items-center">
+            <TechBadgeGroup
+              technologies={project.technologies}
+              limit={3}
+              activeTechnologies={activeTechnologies}
+              onTagClick={onTagClick}
+              className="gap-2"
+              badgeClassName="rounded-full px-3 py-1 text-xs font-sans"
+            />
+          </div>
 
-            const handleClick = (e: React.MouseEvent) => {
-              if (onTagClick) {
-                e.preventDefault();
-                onTagClick(technology);
-                return;
-              }
-            };
-
-            const nextTechnologies = isActive
-              ? activeTechnologies.filter((item) => item !== technology)
-              : [...activeTechnologies, technology];
-
-            return (
-              <Link
-                key={technology}
-                href={
-                  onTagClick
-                    ? "#"
-                    : {
-                        pathname: "/projects",
-                        query:
-                          nextTechnologies.length > 0
-                            ? { tech: nextTechnologies }
-                            : {},
-                      }
-                }
-                onClick={handleClick}
-                className={`rounded-full px-3 py-1 text-xs transition-colors ${
-                  isActive
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted hover:bg-primary hover:text-primary-foreground"
-                }`}
-              >
-                {technology}
-              </Link>
-            );
-          })}
+          <div className="min-h-[14px] flex items-center">
+            {project.languages || project.rawLanguages ? (
+              <LanguageBar
+                languages={project.languages}
+                rawLanguages={project.rawLanguages}
+                barHeight="sm"
+                showLegend={false}
+              />
+            ) : (
+              <div className="h-2 w-full rounded-full bg-muted/20" />
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="relative z-10 flex gap-3 px-6 pb-6 pt-4">
-        {project.demo && (
-          <a
-            href={project.demo}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap text-sm font-medium leading-none hover:underline"
-          >
-            <span>{t("demo")}</span>
-            <ArrowRight className="size-4 shrink-0 -translate-y-px rtl:rotate-180" />
-          </a>
-        )}
+      {/* Action Footer - Strictly Aligned Baseline Across All Cards */}
+      <div className="relative z-10 mt-auto flex items-center justify-between gap-3 px-6 pb-5 pt-3 border-t border-border/30">
+        <div className="flex items-center gap-3">
+          {project.demo && (
+            <CustomTooltip content="Open live demo deployment" side="top">
+              <a
+                href={project.demo}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap text-xs font-semibold px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-2xs"
+              >
+                <span>{t("demo")}</span>
+                <ArrowRight className="size-3.5 shrink-0 -translate-y-px rtl:rotate-180" />
+              </a>
+            </CustomTooltip>
+          )}
 
-        {project.github && (
-          <a
-            href={project.github}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm font-medium text-muted-foreground hover:text-primary"
-          >
-            {t("github")}
-          </a>
-        )}
+          {project.github && (
+            <CustomTooltip content="View source repository on GitHub" side="top">
+              <a
+                href={project.github}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex shrink-0 items-center justify-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+              >
+                <span>{t("github")}</span>
+              </a>
+            </CustomTooltip>
+          )}
+        </div>
       </div>
     </article>
   );

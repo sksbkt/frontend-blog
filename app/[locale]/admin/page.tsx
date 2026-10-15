@@ -20,7 +20,7 @@ export default async function AdminPage({ params }: AdminPageProps) {
   const session = await getSession();
 
   return (
-    <main className="min-h-screen bg-neutral-950 text-neutral-100">
+    <main className="admin-page min-h-screen bg-background text-foreground transition-colors duration-200">
       <AdminDashboard initialSession={session} locale={locale} />
     </main>
   );

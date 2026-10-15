@@ -3,6 +3,7 @@ import { getMessages } from "next-intl/server";
 import { NextIntlClientProvider } from "next-intl";
 
 import AppShell from "@/components/layout/app-shell";
+import { GlobalTooltipProvider } from "@/components/ui/custom-tooltip";
 
 const locales = ["fa", "en"] as const;
 
@@ -24,7 +25,9 @@ export default async function LocaleLayout({
   return (
     <div dir={locale === "fa" ? "rtl" : "ltr"}>
       <NextIntlClientProvider messages={messages}>
-        <AppShell>{children}</AppShell>
+        <GlobalTooltipProvider delayDuration={150} skipDelayDuration={100}>
+          <AppShell>{children}</AppShell>
+        </GlobalTooltipProvider>
       </NextIntlClientProvider>
     </div>
   );

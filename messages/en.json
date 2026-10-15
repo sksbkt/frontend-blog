@@ -132,6 +132,49 @@
             "drafts": "Drafts for Review",
             "published": "Live Projects"
         },
+        "masterDetail": {
+            "backToRepos": "Back to Repositories",
+            "selectRepoPlaceholder": "Select a repository to inspect and manage",
+            "selectRepoHint": "Choose a repository from the list to view architecture audits, deploy to Vercel, or capture visual assets.",
+            "viewMode": {
+                "split": "Detail View",
+                "grid": "Grid View"
+            },
+            "filters": {
+                "all": "All",
+                "synced": "Synced to Sanity",
+                "missingReadme": "Missing README",
+                "hasLiveDemo": "Live Demo"
+            },
+            "tabs": {
+                "overview": "Overview & Health",
+                "audit": "Audit & README",
+                "deployment": "Vercel & Deployment",
+                "gallery": "Media"
+            },
+            "actions": {
+                "quickAudit": "Run AI Audit",
+                "quickDeploy": "Deploy to Vercel",
+                "quickCapture": "Capture Assets",
+                "quickGenerate": "Deep Scan",
+                "reGenerate": "Re-run Deep Scan",
+                "moreActions": "More Actions",
+                "directCommit": "Commit to Main",
+                "createPr": "Create Pull Request",
+                "syncAssets": "Sync to Sanity",
+                "editProject": "Edit in CMS",
+                "publish": "Approve & Publish",
+                "copyReadme": "Copy README",
+                "copied": "Copied!"
+            },
+            "status": {
+                "deployed": "Deployed",
+                "draft": "Draft",
+                "notImported": "Not Imported",
+                "inCiCapture": "In CI Capture",
+                "awaitingConfig": "Awaiting Config"
+            }
+        },
         "repos": {
             "searchPlaceholder": "Search repositories by name or tech...",
             "refresh": "Refresh Repos",

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { getSession } from "@/lib/auth/session";
 import { writeClient } from "@/lib/sanity/write-client";
 
@@ -26,6 +27,9 @@ export async function GET() {
         demo,
         featured,
         content,
+        aiContextDigest,
+        rawLanguages,
+        languages,
         "image": select(
           defined(image.asset->url) => { "_id": image.asset->_id, "url": image.asset->url, "_ref": image.asset->_id },
           defined(image.asset.url) => { "_id": image.asset._id, "url": image.asset.url, "_ref": image.asset._ref },
@@ -139,6 +143,13 @@ export async function POST(request: Request) {
         .delete(id)
         .commit();
 
+      revalidateTag("projects", "max");
+      revalidateTag(`project:${id}`, "max");
+      revalidateTag(`project:${publishedId}`, "max");
+      if (cleanDraft.slug?.current) {
+        revalidateTag(`project:${cleanDraft.slug.current}`, "max");
+      }
+
       return NextResponse.json({
         success: true,
         message: "Project published successfully to portfolio!",
@@ -168,6 +179,13 @@ export async function POST(request: Request) {
         .createOrReplace(draftDoc)
         .delete(id)
         .commit();
+
+      revalidateTag("projects", "max");
+      revalidateTag(`project:${id}`, "max");
+      revalidateTag(`project:${draftId}`, "max");
+      if (cleanDoc.slug?.current) {
+        revalidateTag(`project:${cleanDoc.slug.current}`, "max");
+      }
 
       return NextResponse.json({
         success: true,
@@ -204,7 +222,8 @@ export async function PATCH(request: Request) {
 
   try {
     const body = await request.json();
-    const { id, data } = body;
+    const id = body.id || body._id;
+    const data = body.data || body;
 
     if (!id || typeof id !== "string" || !data || typeof data !== "object") {
       return NextResponse.json(
@@ -229,6 +248,9 @@ export async function PATCH(request: Request) {
       "video",
       "previewGif",
       "image",
+      "aiContextDigest",
+      "rawLanguages",
+      "languages",
     ];
 
     const patchData: Record<string, unknown> = {};
@@ -250,10 +272,17 @@ export async function PATCH(request: Request) {
 
     // Process coverImage and sync with legacy image field
     if ("coverImage" in data && data.coverImage) {
-      let finalAssetRef = data.coverImage.asset?._id || data.coverImage.asset?._ref;
-      const targetUrl = data.coverImage.asset?.url;
+      let finalAssetRef =
+        data.coverImage.asset?._id ||
+        data.coverImage.asset?._ref ||
+        (typeof data.coverImage.asset === "string" ? data.coverImage.asset : null);
+      
+      const targetUrl =
+        data.coverImage.asset?.url ||
+        data.coverImage.url ||
+        (typeof data.coverImage === "string" ? data.coverImage : null);
 
-      // If we only have an external URL (e.g. GitHub OpenGraph), upload it directly to Sanity Assets pipeline
+      // If we only have an external URL (e.g. GitHub raw asset or OpenGraph), upload it directly to Sanity Assets pipeline
       if (!finalAssetRef && targetUrl && /^https?:\/\//i.test(targetUrl)) {
         try {
           const imgRes = await fetch(targetUrl, {
@@ -276,25 +305,16 @@ export async function PATCH(request: Request) {
       }
 
       if (finalAssetRef) {
-        patchData.coverImage = {
+        const coverObj = {
           _type: "image",
-          alt: data.coverImage.alt || "Cover Image",
+          alt: data.coverImage.alt || (typeof data.title === "object" ? data.title?.en : data.title) || "Cover Image",
           asset: {
             _type: "reference",
             _ref: finalAssetRef,
           },
         };
-        // Also update legacy image field so any component querying 'image' immediately reflects the change
-        patchData.image = {
-          _type: "image",
-          alt: data.coverImage.alt || "Cover Image",
-          asset: {
-            _type: "reference",
-            _ref: finalAssetRef,
-          },
-        };
-      } else {
-        patchData.coverImage = data.coverImage;
+        patchData.coverImage = coverObj;
+        patchData.image = coverObj;
       }
     }
 
@@ -340,7 +360,26 @@ export async function PATCH(request: Request) {
       };
     }
 
-    await patch.set(patchData).commit();
+    const exists = await writeClient.getDocument(id);
+    if (!exists) {
+      await writeClient.createOrReplace({
+        _id: id,
+        _type: "project",
+        ...patchData,
+      });
+    } else {
+      await patch.set(patchData).commit();
+    }
+
+    try {
+      revalidateTag("projects", "max");
+      revalidateTag(`project:${id}`, "max");
+      if (data.slug?.current) {
+        revalidateTag(`project:${data.slug.current}`, "max");
+      }
+    } catch (tagErr) {
+      console.warn("Cache revalidation warning:", tagErr);
+    }
 
     return NextResponse.json({
       success: true,
@@ -358,6 +397,8 @@ export async function PATCH(request: Request) {
     );
   }
 }
+
+export const PUT = PATCH;
 
 export async function DELETE(request: Request) {
   const session = await getSession();
@@ -381,6 +422,13 @@ export async function DELETE(request: Request) {
 
   try {
     await writeClient.delete(id);
+
+    try {
+      revalidateTag("projects", "max");
+      revalidateTag(`project:${id}`, "max");
+    } catch (tagErr) {
+      console.warn("Cache revalidation warning:", tagErr);
+    }
 
     return NextResponse.json({
       success: true,

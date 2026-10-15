@@ -6,7 +6,7 @@ import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { useMounted } from "@/hooks/use-mounted";
 
-export function ModeToggle() {
+export function ModeToggle({ className }: { className?: string } = {}) {
   const mounted = useMounted();
   const { resolvedTheme, setTheme } = useTheme();
 
@@ -16,6 +16,7 @@ export function ModeToggle() {
         variant="outline"
         size="icon"
         aria-label="Toggle theme"
+        className={className}
       />
     );
   }
@@ -27,6 +28,7 @@ export function ModeToggle() {
       variant="outline"
       size="icon"
       aria-label="Toggle theme"
+      className={className}
       onClick={() => setTheme(isDark ? "light" : "dark")}
     >
       {isDark ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}

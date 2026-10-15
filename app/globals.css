@@ -307,3 +307,153 @@
 ::-webkit-scrollbar-corner {
   background: transparent !important;
 }
+
+/* ==========================================================================
+   Admin Studio Theme System (Light & Dark Mode)
+   ========================================================================== */
+html:not(.dark) .admin-page {
+  /* Invert / adapt dark neutral tokens to crisp modern light mode */
+  --color-neutral-950: #f8fafc;
+  --color-neutral-900: #ffffff;
+  --color-neutral-850: #f8fafc;
+  --color-neutral-800: #f1f5f9;
+  --color-neutral-700: #e2e8f0;
+  --color-neutral-600: #cbd5e1;
+  --color-neutral-500: #64748b;
+  --color-neutral-400: #475569;
+  --color-neutral-300: #334155;
+  --color-neutral-200: #1e293b;
+  --color-neutral-100: #0f172a;
+  color: #0f172a;
+}
+
+html:not(.dark) .admin-page .text-white {
+  color: #0f172a !important;
+}
+
+html:not(.dark) .admin-page .hover\:text-white:hover {
+  color: #0f172a !important;
+}
+
+/* Primary buttons & active tabs in light mode */
+html:not(.dark) .admin-page .bg-white.text-neutral-950 {
+  background-color: #0f172a !important;
+  color: #ffffff !important;
+}
+
+html:not(.dark) .admin-page .bg-white.text-neutral-950:hover {
+  background-color: #1e293b !important;
+}
+
+html:not(.dark) .admin-page .hover\:bg-neutral-800:hover {
+  background-color: #f1f5f9 !important;
+}
+
+html:not(.dark) .admin-page .hover\:bg-neutral-700:hover {
+  background-color: #e2e8f0 !important;
+}
+
+html:not(.dark) .admin-page .hover\:bg-neutral-200:hover {
+  background-color: #334155 !important;
+}
+
+html:not(.dark) .admin-page .placeholder-neutral-500::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Card, panel and container backgrounds in light mode */
+html:not(.dark) .admin-page .bg-neutral-900,
+html:not(.dark) .admin-page .bg-neutral-900\/70,
+html:not(.dark) .admin-page .bg-neutral-900\/80,
+html:not(.dark) .admin-page .bg-neutral-900\/90,
+html:not(.dark) .admin-page .bg-neutral-900\/95,
+html:not(.dark) .admin-page .bg-neutral-900\/60,
+html:not(.dark) .admin-page .bg-neutral-900\/50,
+html:not(.dark) .admin-page .bg-neutral-900\/40 {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.05);
+}
+
+html:not(.dark) .admin-page .bg-neutral-950,
+html:not(.dark) .admin-page .bg-neutral-950\/40,
+html:not(.dark) .admin-page .bg-neutral-950\/50,
+html:not(.dark) .admin-page .bg-neutral-950\/60 {
+  background-color: #f8fafc !important;
+}
+
+html:not(.dark) .admin-page .bg-neutral-800,
+html:not(.dark) .admin-page .bg-neutral-800\/80,
+html:not(.dark) .admin-page .bg-neutral-800\/60,
+html:not(.dark) .admin-page .bg-neutral-800\/70,
+html:not(.dark) .admin-page .bg-neutral-800\/90 {
+  background-color: #f1f5f9 !important;
+}
+
+/* Borders in light mode */
+html:not(.dark) .admin-page .border-neutral-800,
+html:not(.dark) .admin-page .border-neutral-800\/80,
+html:not(.dark) .admin-page .border-neutral-800\/60,
+html:not(.dark) .admin-page .border-neutral-800\/70 {
+  border-color: #e2e8f0 !important;
+}
+
+html:not(.dark) .admin-page .border-neutral-700,
+html:not(.dark) .admin-page .border-neutral-700\/80,
+html:not(.dark) .admin-page .border-neutral-700\/60 {
+  border-color: #cbd5e1 !important;
+}
+
+html:not(.dark) .admin-page .border-neutral-900 {
+  border-color: #e2e8f0 !important;
+}
+
+/* Inputs & Textareas in light mode */
+html:not(.dark) .admin-page input,
+html:not(.dark) .admin-page textarea {
+  color: #0f172a;
+}
+
+/* Modals backdrop in light mode */
+html:not(.dark) .admin-page .bg-black\/85,
+html:not(.dark) .admin-page .bg-black\/80 {
+  background-color: rgb(15 23 42 / 0.45) !important;
+}
+
+/* Code pre blocks in light mode */
+html:not(.dark) .admin-page pre {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+  color: #1e293b !important;
+}
+
+/* Status & audit badges contrast in light mode */
+html:not(.dark) .admin-page .text-purple-300 {
+  color: #7e22ce !important;
+}
+html:not(.dark) .admin-page .text-amber-300 {
+  color: #b45309 !important;
+}
+html:not(.dark) .admin-page .text-emerald-300 {
+  color: #047857 !important;
+}
+html:not(.dark) .admin-page .text-blue-300 {
+  color: #1d4ed8 !important;
+}
+html:not(.dark) .admin-page .text-red-300 {
+  color: #b91c1c !important;
+}
+html:not(.dark) .admin-page .text-purple-400 {
+  color: #9333ea !important;
+}
+html:not(.dark) .admin-page .text-amber-400 {
+  color: #d97706 !important;
+}
+html:not(.dark) .admin-page .text-emerald-400 {
+  color: #059669 !important;
+}
+html:not(.dark) .admin-page .text-blue-400 {
+  color: #2563eb !important;
+}
+html:not(.dark) .admin-page .text-red-400 {
+  color: #dc2626 !important;
+}

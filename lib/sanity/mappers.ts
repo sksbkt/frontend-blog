@@ -1,5 +1,6 @@
 import type { BlogContentBlock, BlogPost } from "@/types/blog";
 import type { Project } from "@/types/project";
+import { getLanguageColor } from "@/lib/github/languages";
 
 import { urlFor } from "./client";
 
@@ -72,6 +73,13 @@ type SanityProject = {
     challenges?: SanityTextValue;
     outcome?: SanityTextValue;
   };
+  rawLanguages?: Record<string, number> | string;
+  languages?: Array<{
+    name: string;
+    percentage: number;
+    color?: string;
+    bytes?: number;
+  }>;
 };
 
 function isPortableTextBlock(block: unknown): block is SanityPortableTextBlock {
@@ -421,5 +429,14 @@ export function mapSanityProject(project: SanityProject): Project {
         fa: project.content?.outcome?.fa ?? "",
       },
     },
+
+    rawLanguages: project.rawLanguages,
+    languages: project.languages?.map((lang) => ({
+      _key: (lang as { _key?: string })._key,
+      name: lang.name,
+      percentage: lang.percentage,
+      color: lang.color || getLanguageColor(lang.name),
+      bytes: lang.bytes ?? 0,
+    })),
   };
 }

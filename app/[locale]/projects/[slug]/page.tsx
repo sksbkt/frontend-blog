@@ -11,6 +11,8 @@ import {
 import { Link } from "@/i18n/navigation";
 import { client, safeFetch } from "@/lib/sanity/client";
 import { mapSanityProject } from "@/lib/sanity/mappers";
+import { LanguageBar } from "@/components/ui/language-bar";
+import { TechBadgeGroup } from "@/components/ui/tech-badge-group";
 
 type ProjectPageProps = {
   params: Promise<{
@@ -19,40 +21,10 @@ type ProjectPageProps = {
   }>;
 };
 
-const projectBySlugQuery = `*[
-  _type == "project" &&
-  slug.current == $slug
-][0] {
-  _id,
-  title,
-  slug,
-  description,
-  image,
-  coverImage,
-  gallery,
-  video,
-  previewGif,
-  technologies,
-  github,
-  demo,
-  featured,
-  content
-}`;
-
-export const dynamic = "force-dynamic";
+import { getProjectBySlug } from "@/lib/sanity/queries";
 
 async function getProject(slug: string) {
-  const sanityProject = await safeFetch(
-    () =>
-      client.fetch(
-        projectBySlugQuery,
-        { slug },
-        {
-          cache: "no-store",
-        },
-      ),
-    null
-  );
+  const sanityProject = await getProjectBySlug(slug);
 
   if (!sanityProject) {
     return null;
@@ -129,15 +101,12 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
               {project.description[language]}
             </p>
 
-            <div className="mt-8 flex flex-wrap gap-2">
-              {project.technologies.map((technology) => (
-                <span
-                  key={technology}
-                  className="rounded-full bg-muted px-3 py-1.5 text-sm"
-                >
-                  {technology}
-                </span>
-              ))}
+            <div className="mt-8">
+              <TechBadgeGroup
+                technologies={project.technologies}
+                limit={8}
+                size="md"
+              />
             </div>
 
             <div className="mt-8 flex flex-wrap gap-3">
@@ -184,6 +153,21 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
           </div>
 
           <aside className="space-y-8">
+            {/* GitHub Language Breakdown */}
+            {(project.languages || project.rawLanguages) && (
+              <div className="rounded-xl border bg-card p-5 space-y-3 shadow-xs">
+                <h3 className="font-semibold text-sm text-foreground">
+                  Languages & Technologies
+                </h3>
+                <LanguageBar
+                  languages={project.languages}
+                  rawLanguages={project.rawLanguages}
+                  barHeight="md"
+                  showLegend={true}
+                />
+              </div>
+            )}
+
             <div>
               <h3 className="font-semibold">{t("page.challenges")}</h3>
 

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { getSession } from "@/lib/auth/session";
 import { writeClient } from "@/lib/sanity/write-client";
 
@@ -88,6 +89,9 @@ export async function POST(request: Request) {
       }
 
       await patch.commit();
+
+      revalidateTag("projects", "max");
+      revalidateTag(`project:${projectId}`, "max");
     }
 
     return NextResponse.json({

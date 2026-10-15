@@ -3,7 +3,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 import ProjectsExplorer from "@/components/projects/projects-explorer";
 import { client } from "@/lib/sanity/client";
 import { mapSanityProject } from "@/lib/sanity/mappers";
-import { allProjectsQuery } from "@/lib/sanity/queries";
+import { allProjectsQuery, getProjects } from "@/lib/sanity/queries";
 
 type ProjectsPageProps = {
   searchParams: Promise<{
@@ -58,9 +58,9 @@ export default async function ProjectsPage({
       ? [technologyParam.trim()]
       : [];
 
-  const sanityProjects = await client.fetch<
-    Parameters<typeof mapSanityProject>[0][]
-  >(allProjectsQuery, {}, { next: { revalidate: 60, tags: ["projects"] } });
+  const sanityProjects = (await getProjects()) as Parameters<
+    typeof mapSanityProject
+  >[0][];
 
   const projects = sanityProjects.map(mapSanityProject);
 
