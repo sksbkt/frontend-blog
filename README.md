@@ -1,23 +1,24 @@
-# RootZero Engine v1.0-alpha
+# Root Zero Systems Lab™ Platform
 
-> Enterprise Portfolio, Deterministic Telemetry, and Self-Learning Taxonomy Engine.  
+> Engineering Platform, Self-Learning Taxonomy Engine & Asset Storage Runtime  
 > Designed and engineered by **Root Zero Systems Lab™**.
 
 ---
 
 ## Architecture Overview
 
-1. **Canonical Tech Dictionary & Alias Resolver**:
+1. **Self-Hosted Supabase Asset Storage & OpenGraph Cache**:
+   - Automated OpenGraph asset pipeline caching remote cards directly in self-hosted Supabase Storage (`projects/github-og/...` and `projects/covers/...`).
+   - Backed by the PostgreSQL `AssetCache` model with automated 14-day TTL.
+   - Zero external CDN leaks (all project cards served directly via Supabase Storage CDN).
+
+2. **Canonical Tech Dictionary & Alias Resolver**:
    - Self-learning AI taxonomy disambiguation via Google Gemini.
    - Dual-key resolution (`slug` and `aliases` array in PostgreSQL).
    - Eliminates redundant AI calls with guaranteed cache hits.
 
-2. **14-Day OpenGraph Asset Cache**:
-   - Automated OpenGraph asset pipeline caching remote cards in Supabase Storage (`projects/github-og/...`).
-   - Backed by the `AssetCache` model with automated 14-day TTL.
-
 3. **Real-Time Telemetry Event Bus & SSE Stream**:
-   - Server-sent events route (`/api/telemetry/stream`) broadcasting live provenance (`DB_CACHE`, `GEMINI_SYNTHESIS`, `GITHUB_API`).
+   - Server-Sent Events route (`/api/telemetry/stream`) broadcasting live provenance (`DB_CACHE`, `GEMINI_SYNTHESIS`, `GITHUB_API`).
    - Multi-stage SCA Deep Scan with granular progress updates.
 
 4. **Developer HUD Overlay (`<DeveloperHud />`)**:
@@ -35,8 +36,8 @@ npm run dev
 # Run TypeScript validation
 npx tsc --noEmit
 
-# Seed flagship project assets
-npx tsx --env-file=.env.local scripts/seed-project-assets.ts
+# Migrate project covers to Supabase Storage
+npx tsx --env-file=.env.local scripts/migrate-project-covers-to-supabase.ts
 ```
 
 ---

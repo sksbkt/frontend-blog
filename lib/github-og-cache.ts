@@ -26,7 +26,11 @@ export async function getOrCacheGithubOgImage(
       where: { key: cacheKey },
     });
 
-    if (cached && cached.expiresAt > now) {
+    if (
+      cached &&
+      cached.expiresAt > now &&
+      !cached.storageUrl.includes("githubassets.com")
+    ) {
       console.log(`[1/5] Cache HIT: Valid until ${cached.expiresAt.toISOString()}`);
       try {
         const { emitTelemetryEvent } = await import("@/lib/telemetry/event-bus");
@@ -41,7 +45,7 @@ export async function getOrCacheGithubOgImage(
       } catch {}
       return cached.storageUrl;
     }
-    console.log(`[1/5] Cache MISS or expired.`);
+    console.log(`[1/5] Cache MISS, expired, or invalid external URL.`);
   } catch (err) {
     console.warn(`[1/5] Warning reading AssetCache for ${cacheKey}:`, err);
   }
@@ -55,104 +59,82 @@ export async function getOrCacheGithubOgImage(
     },
   });
 
-  let storageUrl = githubOgUrl;
-  let isStorageUploaded = false;
-
   if (!response.ok) {
-    console.warn(`[2/5] GitHub fetch rate-limited or failed (${response.status} ${response.statusText}).`);
-    try {
-      const stale = await prisma.assetCache.findUnique({ where: { key: cacheKey } });
-      if (stale?.storageUrl) {
-        console.log(`[2/5] Serving stale fallback cache.`);
-        return stale.storageUrl;
-      }
-    } catch {}
-    console.log(`[2/5] Using fallback CDN URL directly.`);
-    storageUrl = githubOgUrl;
-  } else {
-    const arrayBuffer = await response.arrayBuffer();
-    const fileBuffer = Buffer.from(arrayBuffer);
-    const storagePath = `github-og/${cleanOwner}-${cleanRepo}.png`;
-    console.log(`[2/5] Binary received: ${fileBuffer.length} bytes.`);
-
-    // [3/5] Uploading binary to Supabase Storage (projects bucket)
-    console.log(`[3/5] Uploading binary to Supabase Storage (projects/${storagePath})...`);
-    try {
-      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-      if (!serviceRoleKey || serviceRoleKey.includes("your-service-ro")) {
-        console.warn(
-          "[3/5] Notice: SUPABASE_SERVICE_ROLE_KEY is using a placeholder. Skipping Supabase Storage upload and caching GitHub OG CDN URL directly."
-        );
-      } else {
-        const serviceClient = getServiceSupabase();
-        const { error: uploadError } = await serviceClient.storage
-          .from("projects")
-          .upload(storagePath, fileBuffer, {
-            contentType: "image/png",
-            upsert: true,
-            cacheControl: "1209600", // 14 days browser cache
-          });
-
-        if (uploadError) {
-          console.error("[3/5] Supabase Storage upload error:", uploadError.message || uploadError);
-        } else {
-          const { data: publicUrlData } = serviceClient.storage
-            .from("projects")
-            .getPublicUrl(storagePath);
-
-          storageUrl = publicUrlData.publicUrl;
-          isStorageUploaded = true;
-          console.log(`[3/5] Upload complete. Public URL: ${storageUrl}`);
-        }
-      }
-    } catch (storageErr: any) {
-      console.error("[3/5] Supabase upload exception:", storageErr?.message || storageErr);
-    }
+    throw new Error(
+      `GitHub OG fetch failed with status ${response.status} (${response.statusText}) for ${repoOwner}/${repoName}`
+    );
   }
+
+  const arrayBuffer = await response.arrayBuffer();
+  const fileBuffer = Buffer.from(arrayBuffer);
+  const storagePath = `github-og/${cleanOwner}-${cleanRepo}.png`;
+  console.log(`[2/5] Binary received: ${fileBuffer.length} bytes.`);
+
+  // [3/5] Uploading binary to Supabase Storage (projects bucket) via Admin Client
+  console.log(`[3/5] Uploading binary to Supabase Storage (projects/${storagePath})...`);
+  const supabaseAdmin = getServiceSupabase();
+
+  const { error: uploadError } = await supabaseAdmin.storage
+    .from("projects")
+    .upload(storagePath, fileBuffer, {
+      contentType: "image/png",
+      upsert: true,
+      cacheControl: "1209600", // 14 days browser cache
+    });
+
+  if (uploadError) {
+    console.error(`[STORAGE UPLOAD ERROR for ${storagePath}]:`, uploadError);
+    throw uploadError;
+  }
+
+  const {
+    data: { publicUrl },
+  } = supabaseAdmin.storage.from("projects").getPublicUrl(storagePath);
+
+  if (!publicUrl || publicUrl.includes("githubassets.com")) {
+    throw new Error(`Invalid publicUrl generated for ${storagePath}: ${publicUrl}`);
+  }
+
+  console.log(`[3/5] Upload complete. Public URL: ${publicUrl}`);
 
   const expiresAt = new Date(Date.now() + FOURTEEN_DAYS_MS);
 
   // [4/5] Writing 14-day TTL record to AssetCache
   console.log(
-    `[4/5] Writing 14-day TTL record to AssetCache (source: ${
-      isStorageUploaded ? "Supabase Storage" : "GitHub OG CDN"
-    }, expires: ${expiresAt.toISOString()})...`
+    `[4/5] Writing 14-day TTL record to AssetCache (source: Supabase Storage, expires: ${expiresAt.toISOString()})...`
   );
-  try {
-    await prisma.assetCache.upsert({
-      where: { key: cacheKey },
-      update: {
-        storageUrl,
-        contentType: "image/png",
-        expiresAt,
-        updatedAt: new Date(),
-      },
-      create: {
-        key: cacheKey,
-        storageUrl,
-        contentType: "image/png",
-        expiresAt,
-      },
-    });
-    console.log(`[4/5] AssetCache upserted successfully into PostgreSQL.`);
-  } catch (dbErr) {
-    console.error(`[4/5] Failed updating AssetCache in DB for ${cacheKey}:`, dbErr);
-  }
+  await prisma.assetCache.upsert({
+    where: { key: cacheKey },
+    update: {
+      storageUrl: publicUrl,
+      contentType: "image/png",
+      expiresAt,
+      updatedAt: new Date(),
+    },
+    create: {
+      key: cacheKey,
+      storageUrl: publicUrl,
+      contentType: "image/png",
+      expiresAt,
+    },
+  });
+  console.log(`[4/5] AssetCache upserted successfully into PostgreSQL.`);
 
+  // [5/5] Emitting live telemetry
   try {
     const { emitTelemetryEvent } = await import("@/lib/telemetry/event-bus");
     emitTelemetryEvent({
       entityType: "og-image",
       key: `${cleanOwner}/${cleanRepo}`,
-      source: isStorageUploaded ? "GITHUB_API" : "GITHUB_API",
+      source: "GITHUB_API",
       latencyMs: Date.now() - now.getTime(),
       status: "SUCCESS",
       details: {
-        storageUrl,
-        uploadedToSupabase: isStorageUploaded,
+        storageUrl: publicUrl,
+        storagePath,
       },
     });
   } catch {}
 
-  return storageUrl;
+  return publicUrl;
 }

@@ -1,6 +1,7 @@
 {
-  "name": "frontend-blog",
+  "name": "@rootzero/platform",
   "version": "1.0.0-alpha",
+  "description": "Root Zero Systems Lab™ Core Engineering Platform & Telemetry Runtime",
   "private": true,
   "author": "Root Zero Systems Lab™",
   "copyright": "© 2026 Root Zero Systems Lab™. All rights reserved.",
