@@ -33,6 +33,8 @@ import { BilingualFieldRow } from "./bilingual-field-row";
 import { LanguageBar } from "@/components/ui/language-bar";
 import { CustomTooltip } from "@/components/ui/custom-tooltip";
 import type { SanityProject, GalleryItem } from "./types";
+import type { ScanStreamEvent } from "@/types/api";
+import { DeveloperTelemetryToggle } from "./developer-telemetry-toggle";
 
 interface ProjectFullPageEditorProps {
   initialProject: SanityProject;
@@ -52,6 +54,7 @@ export function ProjectFullPageEditor({
   const [isPublishing, setIsPublishing] = useState(false);
   const [isSettingCover, setIsSettingCover] = useState<string | null>(null);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+  const [scanProgress, setScanProgress] = useState<ScanStreamEvent | null>(null);
   const [refiningFieldName, setRefiningFieldName] = useState<string | null>(null);
   const [polishingState, setPolishingState] = useState<{
     fieldName: string;
@@ -68,7 +71,7 @@ export function ProjectFullPageEditor({
   const [isUploading, setIsUploading] = useState(false);
   const [toastMessage, setToastMessage] = useState<{
     text: string;
-    type: "success" | "error";
+    type: "success" | "error" | "info";
   } | null>(null);
 
   // Extract GitHub repo fullName (owner/repo) if project has a github URL
@@ -99,38 +102,85 @@ export function ProjectFullPageEditor({
     project.aiContextDigest?.rawDigest || project.aiContextDigest?.summary
   );
 
-  // GRAND GENERATOR: Full repository scan & AI dossier creation
+  // GRAND GENERATOR: Full repository scan & AI dossier creation via SSE stream
   const handleGenerateWithAI = async () => {
     if (!githubRepoFullName) {
       showToast("A valid GitHub repository URL is required to generate AI content.", "error");
       return;
     }
     setIsGeneratingAI(true);
+    setScanProgress({
+      stage: "AUDITING_REPO_TREE",
+      message: "Starting high-signal heuristic analysis...",
+      progressPercent: 10,
+    });
+
     try {
       const res = await fetch(`/api/admin/projects/${encodeURIComponent(project._id)}/ai-analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ fullName: githubRepoFullName }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || data.error || "Failed to generate project draft.");
 
-      if (data.project) {
+      if (!res.ok) {
+        throw new Error(`Failed to initiate scan: ${res.statusText}`);
+      }
+
+      const reader = res.body?.getReader();
+      if (!reader) {
+        throw new Error("Failed to initialize SSE stream reader.");
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let finalData: any = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed.startsWith("data:")) {
+            try {
+              const event: ScanStreamEvent = JSON.parse(trimmed.slice(5).trim());
+              setScanProgress(event);
+
+              if (event.stage === "COMPLETE") {
+                finalData = event.data;
+              } else if (event.stage === "ERROR") {
+                throw new Error(event.message || "Deep Scan failed.");
+              }
+            } catch (parseErr) {
+              if (parseErr instanceof Error && parseErr.message !== "Unexpected end of JSON input") {
+                console.warn("[SSE Parser] Failed to parse event:", parseErr);
+              }
+            }
+          }
+        }
+      }
+
+      if (finalData?.project) {
+        const p = finalData.project;
         setProject((prev) => ({
           ...prev,
-          _id: data.project._id || prev._id,
-          title: data.project.title || prev.title,
-          slug: data.project.slug || prev.slug,
-          description: data.project.description || prev.description,
-          technologies: data.project.technologies?.length ? data.project.technologies : prev.technologies,
-          content: data.project.content || prev.content,
-          featured: data.project.featured ?? prev.featured,
-          demo: data.project.demo || prev.demo,
-          gallery: data.project.gallery || prev.gallery,
-          coverImage: data.project.coverImage || prev.coverImage,
-          aiContextDigest: data.aiContextDigest || data.project.aiContextDigest || prev.aiContextDigest,
-          languages: data.languages || data.project.languages || prev.languages,
-          rawLanguages: data.rawLanguages || data.project.rawLanguages || prev.rawLanguages,
+          _id: p._id || p.id || prev._id,
+          title: p.title || prev.title,
+          slug: p.slug || prev.slug,
+          description: p.description || prev.description,
+          technologies: p.technologies?.length ? p.technologies : prev.technologies,
+          content: p.content || prev.content,
+          featured: p.featured ?? prev.featured,
+          demo: p.demo || p.liveUrl || prev.demo,
+          gallery: p.gallery || prev.gallery,
+          coverImage: p.coverImage || prev.coverImage,
+          aiContextDigest: finalData.aiContextDigest || p.aiContextDigest || prev.aiContextDigest,
+          languages: finalData.languages || p.languages || prev.languages,
+          rawLanguages: finalData.rawLanguages || p.rawLanguages || prev.rawLanguages,
         }));
       }
 
@@ -145,6 +195,7 @@ export function ProjectFullPageEditor({
       showToast(err instanceof Error ? err.message : "Error generating draft.", "error");
     } finally {
       setIsGeneratingAI(false);
+      setScanProgress(null);
     }
   };
 
@@ -407,7 +458,7 @@ export function ProjectFullPageEditor({
     );
   };
 
-  const showToast = (text: string, type: "success" | "error" = "success") => {
+  const showToast = (text: string, type: "success" | "error" | "info" = "success") => {
     setToastMessage({ text, type });
     setTimeout(() => {
       setToastMessage((prev) => (prev?.text === text ? null : prev));
@@ -610,11 +661,15 @@ export function ProjectFullPageEditor({
           className={`fixed bottom-6 end-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border text-sm font-medium animate-in fade-in slide-in-from-bottom-5 duration-300 ${
             toastMessage.type === "success"
               ? "bg-emerald-950/90 border-emerald-700/80 text-emerald-200"
+              : toastMessage.type === "info"
+              ? "bg-blue-950/90 border-blue-700/80 text-blue-200"
               : "bg-red-950/90 border-red-700/80 text-red-200"
           }`}
         >
           {toastMessage.type === "success" ? (
             <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+          ) : toastMessage.type === "info" ? (
+            <Sparkles className="w-5 h-5 text-blue-400 shrink-0" />
           ) : (
             <X className="w-5 h-5 text-red-400 shrink-0" />
           )}
@@ -640,6 +695,7 @@ export function ProjectFullPageEditor({
         />
 
         <div className="flex items-center gap-2.5">
+          <DeveloperTelemetryToggle onToast={showToast} compact />
           <button
             type="button"
             onClick={() => router.push(`/${locale}/admin?view=grid`)}
@@ -885,6 +941,25 @@ export function ProjectFullPageEditor({
             </CustomTooltip>
           )}
         </div>
+
+        {/* Live SSE Deep Scan Progress Indicator */}
+        {scanProgress && (
+          <div className="p-4 rounded-xl border border-primary/30 bg-primary/5 space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-semibold text-primary flex items-center gap-2">
+                <RefreshCw className="w-3.5 h-3.5 animate-spin text-primary shrink-0" />
+                <span>{scanProgress.message}</span>
+              </span>
+              <span className="font-mono text-xs font-bold text-primary">{scanProgress.progressPercent}%</span>
+            </div>
+            <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
+              <div
+                className="bg-primary h-1.5 rounded-full transition-all duration-300 ease-out"
+                style={{ width: `${scanProgress.progressPercent}%` }}
+              />
+            </div>
+          </div>
+        )}
 
         {/* GitHub Language Breakdown Bar in Repository Audit Header */}
         {(project.languages || project.rawLanguages) && (

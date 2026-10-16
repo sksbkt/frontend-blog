@@ -9,8 +9,7 @@ import {
 } from "react-icons/fa";
 
 import { Link } from "@/i18n/navigation";
-import { client, safeFetch } from "@/lib/sanity/client";
-import { mapSanityProject } from "@/lib/sanity/mappers";
+import { getDbProjectBySlug } from "@/lib/services/project-service";
 import { LanguageBar } from "@/components/ui/language-bar";
 import { TechBadgeGroup } from "@/components/ui/tech-badge-group";
 
@@ -21,16 +20,8 @@ type ProjectPageProps = {
   }>;
 };
 
-import { getProjectBySlug } from "@/lib/sanity/queries";
-
 async function getProject(slug: string) {
-  const sanityProject = await getProjectBySlug(slug);
-
-  if (!sanityProject) {
-    return null;
-  }
-
-  return mapSanityProject(sanityProject);
+  return await getDbProjectBySlug(slug);
 }
 
 export async function generateMetadata({

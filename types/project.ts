@@ -47,6 +47,7 @@ export type Project = {
   content: ProjectContent;
   rawLanguages?: Record<string, number> | string;
   languages?: ProjectLanguageItem[];
+  aiContextDigest?: Record<string, unknown> | null;
 };
 
 

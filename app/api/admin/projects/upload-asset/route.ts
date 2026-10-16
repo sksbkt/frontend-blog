@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { getSession } from "@/lib/auth/session";
-import { writeClient } from "@/lib/sanity/write-client";
+import { uploadProjectImage } from "@/lib/supabase";
+import { prisma } from "@/lib/prisma";
 
 export async function POST(request: Request) {
   const session = await getSession();
@@ -27,84 +28,57 @@ export async function POST(request: Request) {
       );
     }
 
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    const cleanId = projectId ? projectId.replace(/^drafts\./, "") : undefined;
 
-    // Upload to Sanity
-    const isVideo = file.type.startsWith("video/");
-    const assetType = isVideo ? "file" : "image";
+    // Upload to Supabase Storage "projects" bucket
+    const publicUrl = await uploadProjectImage(file, cleanId || "asset");
 
-    const uploadedAsset = await writeClient.assets.upload(assetType, buffer, {
-      filename: file.name,
-      contentType: file.type,
-    });
+    const galleryItem = {
+      _key: `manual_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      _type: "galleryImage",
+      caption: caption || file.name,
+      alt: caption || file.name,
+      asset: {
+        _id: publicUrl,
+        url: publicUrl,
+      },
+    };
 
-    if (!uploadedAsset?._id) {
-      throw new Error("Failed to upload asset to Sanity.");
-    }
+    // If projectId is provided, update project in Prisma
+    if (cleanId) {
+      const existing = await prisma.project.findFirst({
+        where: {
+          OR: [{ id: cleanId }, { slug: cleanId }],
+        },
+      });
 
-    let galleryItem = null;
-
-    // If projectId is provided, update project document
-    if (projectId) {
-      const patch = writeClient.patch(projectId);
-
-      if (isVideo) {
-        patch.set({
-          "video.enabled": true,
-          "video.asset": {
-            _type: "reference",
-            _ref: uploadedAsset._id,
+      if (existing) {
+        await prisma.project.update({
+          where: { id: existing.id },
+          data: {
+            ...(isCover ? { coverImageUrl: publicUrl } : {}),
           },
         });
-      } else {
-        const itemKey = `manual_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-        galleryItem = {
-          _key: itemKey,
-          _type: "galleryImage",
-          caption: caption || file.name,
-          alt: caption || file.name,
-          asset: {
-            _type: "reference",
-            _ref: uploadedAsset._id,
-          },
-        };
 
-        // Append to gallery
-        patch.setIfMissing({ gallery: [] });
-        patch.append("gallery", [galleryItem]);
-
-        if (isCover) {
-          patch.set({
-            coverImage: {
-              _type: "image",
-              alt: caption || file.name,
-              asset: {
-                _type: "reference",
-                _ref: uploadedAsset._id,
-              },
-            },
-          });
-        }
+        try {
+          revalidateTag("projects", "max");
+          revalidateTag(`project:${existing.id}`, "max");
+          revalidateTag(`project:${existing.slug}`, "max");
+        } catch {}
       }
-
-      await patch.commit();
-
-      revalidateTag("projects", "max");
-      revalidateTag(`project:${projectId}`, "max");
     }
 
     return NextResponse.json({
       success: true,
       asset: {
-        _id: uploadedAsset._id,
-        url: uploadedAsset.url,
+        _id: publicUrl,
+        url: publicUrl,
       },
       galleryItem,
-      message: "Asset uploaded successfully to Sanity!",
+      message: "Asset uploaded successfully to Supabase Storage!",
     });
   } catch (error) {
-    console.error("Upload asset error:", error);
+    console.error("[Upload-Asset] Error:", error);
     return NextResponse.json(
       {
         success: false,

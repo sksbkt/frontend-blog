@@ -2,48 +2,11 @@ import { getTranslations } from "next-intl/server";
 
 import FeaturedProjectsMotion from "@/components/projects/featured-projects-motion";
 import ProjectCard from "@/components/projects/project-card";
-import { client, safeFetch } from "@/lib/sanity/client";
-import { mapSanityProject } from "@/lib/sanity/mappers";
-
-const featuredProjectsQuery = `*[
-  _type == "project" &&
-  featured == true
-] | order(_createdAt desc) {
-  _id,
-  title,
-  slug,
-  description,
-  image,
-  coverImage,
-  gallery,
-  video,
-  previewGif,
-  technologies,
-  github,
-  demo,
-  featured,
-  content
-}`;
+import { getDbFeaturedProjects } from "@/lib/services/project-service";
 
 export default async function FeaturedProjects() {
   const t = await getTranslations("projects");
-
-  const sanityProjects: Parameters<typeof mapSanityProject>[0][] = await safeFetch(
-    () =>
-      client.fetch(
-        featuredProjectsQuery,
-        {},
-        {
-          next: {
-            tags: ["projects"],
-            revalidate: false,
-          },
-        }
-      ),
-    []
-  );
-
-  const featuredProjects = sanityProjects.map(mapSanityProject);
+  const featuredProjects = await getDbFeaturedProjects();
 
   return (
     <section className="py-20">

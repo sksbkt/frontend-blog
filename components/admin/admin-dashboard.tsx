@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import {
   Search,
   RefreshCw,
@@ -14,6 +15,8 @@ import {
   X,
   LayoutGrid,
   Columns2,
+  Activity,
+  BookOpen,
 } from "lucide-react";
 import { FaGithub as Github } from "react-icons/fa";
 import { useTranslations } from "next-intl";
@@ -25,6 +28,7 @@ import { CommandDeckDetail } from "./command-deck-detail";
 import { PushReadmeModal } from "./push-readme-modal";
 import { VercelDeployModal } from "./vercel-deploy-modal";
 import { ProjectEditModal } from "./project-edit-modal";
+import { DeveloperTelemetryToggle } from "./developer-telemetry-toggle";
 import type {
   AdminSession,
   RepositoryItem,
@@ -79,10 +83,10 @@ export default function AdminDashboard({
   // Toast message state
   const [message, setMessage] = useState<{
     text: string;
-    type: "success" | "error";
+    type: "success" | "error" | "info";
   } | null>(null);
 
-  const showToast = useCallback((text: string, type: "success" | "error" = "success") => {
+  const showToast = useCallback((text: string, type: "success" | "error" | "info" = "success") => {
     setMessage({ text, type });
     setTimeout(() => {
       setMessage((prev) => (prev?.text === text ? null : prev));
@@ -410,11 +414,15 @@ export default function AdminDashboard({
           className={`fixed bottom-6 end-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border text-sm font-medium animate-in fade-in slide-in-from-bottom-5 duration-300 ${
             message.type === "success"
               ? "bg-emerald-950/90 border-emerald-700/80 text-emerald-200"
+              : message.type === "info"
+              ? "bg-blue-950/90 border-blue-700/80 text-blue-200"
               : "bg-red-950/90 border-red-700/80 text-red-200"
           }`}
         >
           {message.type === "success" ? (
             <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+          ) : message.type === "info" ? (
+            <Activity className="w-5 h-5 text-blue-400 shrink-0" />
           ) : (
             <AlertCircle className="w-5 h-5 text-red-400 shrink-0" />
           )}
@@ -492,6 +500,19 @@ export default function AdminDashboard({
           </div>
 
           <div className="h-6 w-px bg-border hidden sm:block" />
+
+          {/* Tech Dictionary CMS Link */}
+          <Link
+            href={`/${locale}/admin/techs`}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl border border-primary/20 bg-primary/5 text-primary hover:bg-primary/10 transition-colors shadow-xs min-h-[40px]"
+            title="Manage Canonical Tech Dictionary & Aliases"
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Tech Dictionary</span>
+          </Link>
+
+          {/* Developer Telemetry HUD Toggle */}
+          <DeveloperTelemetryToggle onToast={showToast} compact />
 
           {/* Theme Mode Toggle */}
           <ModeToggle />

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { getSession } from "@/lib/auth/session";
-import { writeClient } from "@/lib/sanity/write-client";
+import { prisma } from "@/lib/prisma";
+import { mapPrismaToAdminProject } from "@/lib/services/project-service";
 
 export async function GET() {
   const session = await getSession();
@@ -9,92 +10,33 @@ export async function GET() {
   if (!session) {
     return NextResponse.json(
       { success: false, message: "Unauthorized: Admin session required." },
-      { status: 401 },
+      { status: 401 }
     );
   }
 
   try {
-    const projects = await writeClient.fetch(
-      `*[_type == "project"] | order(_createdAt desc){
-        _id,
-        _createdAt,
-        _updatedAt,
-        title,
-        slug,
-        description,
-        technologies,
-        github,
-        demo,
-        featured,
-        content,
-        aiContextDigest,
-        rawLanguages,
-        languages,
-        "image": select(
-          defined(image.asset->url) => { "_id": image.asset->_id, "url": image.asset->url, "_ref": image.asset->_id },
-          defined(image.asset.url) => { "_id": image.asset._id, "url": image.asset.url, "_ref": image.asset._ref },
-          null
-        ),
-        coverImage{
-          alt,
-          _type,
-          "asset": select(
-            defined(asset->url) => { "_id": asset->_id, "url": asset->url, "_ref": asset->_id },
-            defined(asset.url) => { "_id": asset._id, "url": asset.url, "_ref": asset._ref },
-            null
-          )
-        },
-        gallery[]{
-          alt,
-          caption,
-          _key,
-          _type,
-          "asset": select(
-            defined(asset->url) => { "_id": asset->_id, "url": asset->url, "_ref": asset->_id },
-            defined(asset.url) => { "_id": asset._id, "url": asset.url, "_ref": asset._ref },
-            null
-          )
-        },
-        video{
-          enabled,
-          url,
-          "asset": select(
-            defined(asset->url) => { "_id": asset->_id, "url": asset->url },
-            defined(asset.url) => { "_id": asset._id, "url": asset.url },
-            null
-          )
-        },
-        previewGif{
-          enabled,
-          alt,
-          _type,
-          "asset": select(
-            defined(asset->url) => { "_id": asset->_id, "url": asset->url, "_ref": asset->_id },
-            defined(asset.url) => { "_id": asset._id, "url": asset.url, "_ref": asset._ref },
-            null
-          )
-        },
-        "isDraft": _id in path("drafts.**")
-      }`,
-    );
+    const projects = await prisma.project.findMany({
+      orderBy: [{ order: "asc" }, { createdAt: "desc" }],
+    });
 
-    const drafts = projects.filter((p: { isDraft: boolean }) => p.isDraft);
-    const published = projects.filter((p: { isDraft: boolean }) => !p.isDraft);
+    const adminProjects = projects.map(mapPrismaToAdminProject);
+    const drafts = adminProjects.filter((p) => p.isDraft);
+    const published = adminProjects.filter((p) => !p.isDraft);
 
     return NextResponse.json({
       success: true,
       drafts,
       published,
-      all: projects,
+      all: adminProjects,
     });
   } catch (error) {
-    console.error("Admin fetch projects error:", error);
+    console.error("[Admin GET projects] Error:", error);
     return NextResponse.json(
       {
         success: false,
         message: error instanceof Error ? error.message : "Failed to fetch projects.",
       },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }
@@ -105,7 +47,7 @@ export async function POST(request: Request) {
   if (!session) {
     return NextResponse.json(
       { success: false, message: "Unauthorized: Admin session required." },
-      { status: 401 },
+      { status: 401 }
     );
   }
 
@@ -116,96 +58,74 @@ export async function POST(request: Request) {
     if (!id || typeof id !== "string") {
       return NextResponse.json(
         { success: false, message: "Project ID is required." },
-        { status: 400 },
+        { status: 400 }
+      );
+    }
+
+    const cleanId = id.replace(/^drafts\./, "");
+    const targetProject = await prisma.project.findFirst({
+      where: {
+        OR: [{ id: cleanId }, { slug: cleanId }],
+      },
+    });
+
+    if (!targetProject) {
+      return NextResponse.json(
+        { success: false, message: "Project document not found in database." },
+        { status: 404 }
       );
     }
 
     if (action === "publish") {
-      const draftDoc = await writeClient.getDocument(id);
+      const updated = await prisma.project.update({
+        where: { id: targetProject.id },
+        data: { isPublished: true },
+      });
 
-      if (!draftDoc) {
-        return NextResponse.json(
-          { success: false, message: "Draft document not found." },
-          { status: 404 },
-        );
-      }
-
-      const publishedId = id.replace(/^drafts\./, "");
-      const { _rev, ...cleanDraft } = draftDoc;
-      const publishedDoc = {
-        ...cleanDraft,
-        _id: publishedId,
-      };
-
-      await writeClient
-        .transaction()
-        .createOrReplace(publishedDoc)
-        .delete(id)
-        .commit();
-
-      revalidateTag("projects", "max");
-      revalidateTag(`project:${id}`, "max");
-      revalidateTag(`project:${publishedId}`, "max");
-      if (cleanDraft.slug?.current) {
-        revalidateTag(`project:${cleanDraft.slug.current}`, "max");
-      }
+      try {
+        revalidateTag("projects", "max");
+        revalidateTag(`project:${updated.slug}`, "max");
+        revalidateTag(`project:${updated.id}`, "max");
+      } catch {}
 
       return NextResponse.json({
         success: true,
         message: "Project published successfully to portfolio!",
-        publishedId,
+        publishedId: updated.id,
       });
     }
 
     if (action === "unpublish") {
-      const publishedDoc = await writeClient.getDocument(id);
+      const updated = await prisma.project.update({
+        where: { id: targetProject.id },
+        data: { isPublished: false },
+      });
 
-      if (!publishedDoc) {
-        return NextResponse.json(
-          { success: false, message: "Project document not found." },
-          { status: 404 },
-        );
-      }
-
-      const draftId = id.startsWith("drafts.") ? id : `drafts.${id}`;
-      const { _rev, ...cleanDoc } = publishedDoc;
-      const draftDoc = {
-        ...cleanDoc,
-        _id: draftId,
-      };
-
-      await writeClient
-        .transaction()
-        .createOrReplace(draftDoc)
-        .delete(id)
-        .commit();
-
-      revalidateTag("projects", "max");
-      revalidateTag(`project:${id}`, "max");
-      revalidateTag(`project:${draftId}`, "max");
-      if (cleanDoc.slug?.current) {
-        revalidateTag(`project:${cleanDoc.slug.current}`, "max");
-      }
+      try {
+        revalidateTag("projects", "max");
+        revalidateTag(`project:${updated.slug}`, "max");
+        revalidateTag(`project:${updated.id}`, "max");
+      } catch {}
 
       return NextResponse.json({
         success: true,
         message: "Project moved to drafts.",
-        draftId,
+        draftId: `drafts.${updated.id}`,
       });
     }
 
     return NextResponse.json(
       { success: false, message: `Unsupported action: "${action}"` },
-      { status: 400 },
+      { status: 400 }
     );
   } catch (error) {
-    console.error("Admin project action error:", error);
+    console.error("[Admin POST project action] Error:", error);
     return NextResponse.json(
       {
         success: false,
         message: error instanceof Error ? error.message : "Project action failed.",
       },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }
@@ -216,184 +136,130 @@ export async function PATCH(request: Request) {
   if (!session) {
     return NextResponse.json(
       { success: false, message: "Unauthorized: Admin session required." },
-      { status: 401 },
+      { status: 401 }
     );
   }
 
   try {
     const body = await request.json();
-    const id = body.id || body._id;
+    const rawId = body.id || body._id;
     const data = body.data || body;
 
-    if (!id || typeof id !== "string" || !data || typeof data !== "object") {
+    if (!rawId || typeof rawId !== "string" || !data || typeof data !== "object") {
       return NextResponse.json(
         { success: false, message: "Project ID and update data are required." },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
-    // Prepare patch
-    const patch = writeClient.patch(id);
-    const allowedFields = [
-      "title",
-      "slug",
-      "description",
-      "technologies",
-      "github",
-      "demo",
-      "featured",
-      "content",
-      "coverImage",
-      "gallery",
-      "video",
-      "previewGif",
-      "image",
-      "aiContextDigest",
-      "rawLanguages",
-      "languages",
-    ];
+    const cleanId = rawId.replace(/^drafts\./, "");
+    const existing = await prisma.project.findFirst({
+      where: {
+        OR: [{ id: cleanId }, { slug: cleanId }],
+      },
+    });
 
-    const patchData: Record<string, unknown> = {};
-    for (const field of allowedFields) {
-      if (field in data) {
-        if (field === "slug" && typeof data.slug === "string") {
-          patchData.slug = { _type: "slug", current: data.slug };
-        } else if (field === "coverImage") {
-          // Handled specially below
-        } else if (field === "gallery") {
-          // Handled specially below
-        } else if (field === "previewGif") {
-          // Handled specially below
-        } else {
-          patchData[field] = data[field];
-        }
-      }
+    if (!existing) {
+      return NextResponse.json(
+        { success: false, message: "Project not found in database." },
+        { status: 404 }
+      );
     }
 
-    // Process coverImage and sync with legacy image field
-    if ("coverImage" in data && data.coverImage) {
-      let finalAssetRef =
-        data.coverImage.asset?._id ||
-        data.coverImage.asset?._ref ||
-        (typeof data.coverImage.asset === "string" ? data.coverImage.asset : null);
-      
-      const targetUrl =
+    // Resolve cover image URL if provided
+    let coverImageUrl: string | undefined = undefined;
+    if (data.coverImage) {
+      coverImageUrl =
         data.coverImage.asset?.url ||
         data.coverImage.url ||
-        (typeof data.coverImage === "string" ? data.coverImage : null);
+        (typeof data.coverImage === "string" ? data.coverImage : undefined);
+    } else if (data.image) {
+      coverImageUrl =
+        data.image.asset?.url ||
+        data.image.url ||
+        (typeof data.image === "string" ? data.image : undefined);
+    }
 
-      // If we only have an external URL (e.g. GitHub raw asset or OpenGraph), upload it directly to Sanity Assets pipeline
-      if (!finalAssetRef && targetUrl && /^https?:\/\//i.test(targetUrl)) {
-        try {
-          const imgRes = await fetch(targetUrl, {
-            headers: {
-              "User-Agent": "Mozilla/5.0 (compatible; PortfolioAdmin/1.0)",
-            },
-          });
-          if (imgRes.ok) {
-            const buffer = Buffer.from(await imgRes.arrayBuffer());
-            const uploaded = await writeClient.assets.upload("image", buffer, {
-              filename: `cover-${id.replace(/[^a-zA-Z0-9_-]/g, "")}.png`,
-            });
-            if (uploaded?._id) {
-              finalAssetRef = uploaded._id;
-            }
-          }
-        } catch (uploadErr) {
-          console.warn("[Admin PATCH] Warning uploading external cover image to Sanity:", uploadErr);
-        }
-      }
+    const updatePayload: Record<string, any> = {};
 
-      if (finalAssetRef) {
-        const coverObj = {
-          _type: "image",
-          alt: data.coverImage.alt || (typeof data.title === "object" ? data.title?.en : data.title) || "Cover Image",
-          asset: {
-            _type: "reference",
-            _ref: finalAssetRef,
-          },
-        };
-        patchData.coverImage = coverObj;
-        patchData.image = coverObj;
+    if (data.title) {
+      updatePayload.title =
+        typeof data.title === "object" ? data.title.en || data.title.fa : data.title;
+    }
+
+    if (data.slug) {
+      updatePayload.slug =
+        typeof data.slug === "object" ? data.slug.current : data.slug;
+    }
+
+    if (data.description) {
+      if (typeof data.description === "object") {
+        if (data.description.en !== undefined) updatePayload.taglineEn = data.description.en;
+        if (data.description.fa !== undefined) updatePayload.taglineFa = data.description.fa;
+      } else {
+        updatePayload.taglineEn = data.description;
       }
     }
 
-    // Process gallery items
-    if ("gallery" in data && Array.isArray(data.gallery)) {
-      patchData.gallery = data.gallery.map((item: any, idx: number) => {
-        const assetRef = item.asset?._id || item.asset?._ref;
-        return {
-          _key: item._key || `gallery-${Date.now()}-${idx}`,
-          _type: "galleryImage",
-          caption: item.caption || "",
-          alt: item.alt || item.caption || "Gallery Image",
-          ...(assetRef
-            ? {
-                asset: {
-                  _type: "reference",
-                  _ref: assetRef,
-                },
-              }
-            : item.asset
-            ? { asset: item.asset }
-            : {}),
-        };
-      });
+    if (data.content?.overview) {
+      if (typeof data.content.overview === "object") {
+        if (data.content.overview.en !== undefined) updatePayload.descriptionEn = data.content.overview.en;
+        if (data.content.overview.fa !== undefined) updatePayload.descriptionFa = data.content.overview.fa;
+      }
     }
 
-    // Process previewGif
-    if ("previewGif" in data && data.previewGif) {
-      const assetRef = data.previewGif.asset?._id || data.previewGif.asset?._ref;
-      patchData.previewGif = {
-        _type: "image",
-        enabled: data.previewGif.enabled !== false,
-        ...(assetRef
-          ? {
-              asset: {
-                _type: "reference",
-                _ref: assetRef,
-              },
-            }
-          : data.previewGif.asset
-          ? { asset: data.previewGif.asset }
-          : {}),
-      };
+    if (Array.isArray(data.technologies)) {
+      updatePayload.technologies = data.technologies;
     }
 
-    const exists = await writeClient.getDocument(id);
-    if (!exists) {
-      await writeClient.createOrReplace({
-        _id: id,
-        _type: "project",
-        ...patchData,
-      });
-    } else {
-      await patch.set(patchData).commit();
+    if (data.github !== undefined) {
+      updatePayload.githubUrl = data.github;
     }
+
+    if (data.demo !== undefined) {
+      updatePayload.liveUrl = data.demo;
+    }
+
+    if (data.featured !== undefined) {
+      updatePayload.featured = Boolean(data.featured);
+    }
+
+    if (coverImageUrl) {
+      updatePayload.coverImageUrl = coverImageUrl;
+    }
+
+    if (data.aiContextDigest !== undefined) {
+      updatePayload.aiContextDigest = data.aiContextDigest;
+    }
+
+    if (data.languages !== undefined) {
+      updatePayload.languages = data.languages;
+    }
+
+    const updated = await prisma.project.update({
+      where: { id: existing.id },
+      data: updatePayload,
+    });
 
     try {
       revalidateTag("projects", "max");
-      revalidateTag(`project:${id}`, "max");
-      if (data.slug?.current) {
-        revalidateTag(`project:${data.slug.current}`, "max");
-      }
-    } catch (tagErr) {
-      console.warn("Cache revalidation warning:", tagErr);
-    }
+      revalidateTag(`project:${updated.id}`, "max");
+      revalidateTag(`project:${updated.slug}`, "max");
+    } catch {}
 
     return NextResponse.json({
       success: true,
-      message: "Project updated successfully.",
-      coverImage: patchData.coverImage,
+      message: "Project updated successfully in PostgreSQL.",
+      project: mapPrismaToAdminProject(updated),
     });
   } catch (error) {
-    console.error("Admin patch project error:", error);
+    console.error("[Admin PATCH project] Error:", error);
     return NextResponse.json(
       {
         success: false,
         message: error instanceof Error ? error.message : "Failed to update project.",
       },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }
@@ -406,42 +272,52 @@ export async function DELETE(request: Request) {
   if (!session) {
     return NextResponse.json(
       { success: false, message: "Unauthorized: Admin session required." },
-      { status: 401 },
+      { status: 401 }
     );
   }
 
   const { searchParams } = new URL(request.url);
-  const id = searchParams.get("id");
+  const rawId = searchParams.get("id");
 
-  if (!id) {
+  if (!rawId) {
     return NextResponse.json(
       { success: false, message: "Project ID is required." },
-      { status: 400 },
+      { status: 400 }
     );
   }
 
-  try {
-    await writeClient.delete(id);
+  const cleanId = rawId.replace(/^drafts\./, "");
 
-    try {
-      revalidateTag("projects", "max");
-      revalidateTag(`project:${id}`, "max");
-    } catch (tagErr) {
-      console.warn("Cache revalidation warning:", tagErr);
+  try {
+    const existing = await prisma.project.findFirst({
+      where: {
+        OR: [{ id: cleanId }, { slug: cleanId }],
+      },
+    });
+
+    if (existing) {
+      await prisma.project.delete({
+        where: { id: existing.id },
+      });
+
+      try {
+        revalidateTag("projects", "max");
+        revalidateTag(`project:${existing.slug}`, "max");
+      } catch {}
     }
 
     return NextResponse.json({
       success: true,
-      message: "Project deleted successfully.",
+      message: "Project deleted successfully from database.",
     });
   } catch (error) {
-    console.error("Admin delete project error:", error);
+    console.error("[Admin DELETE project] Error:", error);
     return NextResponse.json(
       {
         success: false,
         message: error instanceof Error ? error.message : "Failed to delete project.",
       },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

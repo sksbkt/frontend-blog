@@ -84,19 +84,19 @@ export const BASELINE_TECH_DEFINITIONS: Record<
 };
 
 /**
- * Normalizes a tech string into a slug for Sanity & cache lookup
+ * Canonical normalization for tech definitions across database, API, and UI
  */
-export function slugifyTech(name: string): string {
+export function normalizeTechSlug(name: string): string {
   if (!name) return "";
   return name
     .toLowerCase()
     .trim()
-    .replace(/\+/g, "plus")
-    .replace(/#/g, "sharp")
-    .replace(/\.js$/i, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
+    .replace(/\./g, "")          // e.g. "next.js" -> "nextjs", "nextauth.js" -> "nextauthjs"
+    .replace(/[^a-z0-9]+/g, "-") // e.g. "c++" or "node js"
+    .replace(/^-+|-+$/g, "");
 }
+
+export const slugifyTech = normalizeTechSlug;
 
 /**
  * Resolve instant definition from baseline or memory cache

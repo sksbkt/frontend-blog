@@ -8,10 +8,10 @@
  */
 
 export interface BackoffOptions {
-  maxRetries?: number; // default: 4
-  baseDelay?: number; // default: 1500ms
-  maxDelay?: number; // default: 25000ms
-  jitterMax?: number; // default: 800ms
+  maxRetries?: number; // default: 2
+  baseDelay?: number; // default: 800ms
+  maxDelay?: number; // default: 6000ms
+  jitterMax?: number; // default: 400ms
 }
 
 export class GeminiRateLimitError extends Error {
@@ -63,10 +63,10 @@ export async function withExponentialBackoff<T>(
   fn: () => Promise<T>,
   options?: BackoffOptions
 ): Promise<T> {
-  const maxRetries = options?.maxRetries ?? 4;
-  const baseDelay = options?.baseDelay ?? 1500;
-  const maxDelay = options?.maxDelay ?? 25000;
-  const jitterMax = options?.jitterMax ?? 800;
+  const maxRetries = options?.maxRetries ?? 2;
+  const baseDelay = options?.baseDelay ?? 800;
+  const maxDelay = options?.maxDelay ?? 6000;
+  const jitterMax = options?.jitterMax ?? 400;
 
   let lastError: unknown = null;
 
@@ -76,8 +76,17 @@ export async function withExponentialBackoff<T>(
     } catch (err) {
       lastError = err;
 
-      // If this is the last attempt or the error is not transient rate limiting, stop
-      if (attempt > maxRetries || !isRateLimitOrCapacityError(err)) {
+      // If this is the last attempt, non-transient, or a daily/hourly quota exhaustion, stop immediately
+      const isDailyExhausted =
+        err instanceof Error &&
+        (/PerDay/i.test(err.message) ||
+          /retry in \d+h/i.test(err.message) ||
+          /GenerateRequestsPerDay/i.test(err.message));
+
+      if (attempt > maxRetries || !isRateLimitOrCapacityError(err) || isDailyExhausted) {
+        if (isDailyExhausted) {
+          console.warn("[GeminiQueue] Daily quota exhausted for current model. Failing fast to fallback candidate...");
+        }
         break;
       }
 

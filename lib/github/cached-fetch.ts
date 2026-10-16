@@ -1,13 +1,14 @@
 /**
- * GitHub API ETag Caching & Rate-Limit Shield
+ * GitHub API ETag Caching & Rate-Limit Shield with Persistent Prisma ApiCache
  *
  * Implements:
- * 1. In-memory TTL caching (default: 3600s / 1hr) to eliminate redundant requests.
+ * 1. Two-tier caching: In-memory (L1) + PostgreSQL Prisma ApiCache (L2).
  * 2. ETag (If-None-Match) conditional HTTP validation (304 Not Modified uses 0 API quota).
  * 3. GITHUB_TOKEN authentication header attachment (upgrades to 5,000 req/hr).
- * 4. Rate-limit monitoring and descriptive error handling on 403 / 429.
- * 5. Bypass option (forceRefresh: true) for manual busts.
+ * 4. Eliminates serverless memory loss.
  */
+
+import { prisma } from "@/lib/prisma";
 
 export interface CachedFetchOptions {
   token?: string;
@@ -23,11 +24,11 @@ export interface CacheEntry<T = unknown> {
   timestamp: number;
 }
 
-// Global in-memory cache store
+// Global in-memory L1 cache store
 const gitHubCache = new Map<string, CacheEntry<unknown>>();
 
 /**
- * Perform a GitHub API request protected by ETag caching and in-memory TTL
+ * Perform a GitHub API request protected by ETag caching, in-memory TTL, and PostgreSQL persistence
  */
 export async function fetchGitHubWithCache<T>(
   urlOrEndpoint: string,
@@ -38,9 +39,9 @@ export async function fetchGitHubWithCache<T>(
     : `https://api.github.com${urlOrEndpoint.startsWith("/") ? "" : "/"}${urlOrEndpoint}`;
 
   const revalidateMs = (options?.revalidateSeconds ?? 3600) * 1000;
-  const cached = gitHubCache.get(url) as CacheEntry<T> | undefined;
+  let cached = gitHubCache.get(url) as CacheEntry<T> | undefined;
 
-  // 1. Fast in-memory TTL hit: bypass network entirely if fresh and not force-refreshing
+  // 1. Check L1 Memory Cache
   if (!options?.forceRefresh && cached) {
     const ageMs = Date.now() - cached.timestamp;
     if (ageMs < revalidateMs) {
@@ -48,7 +49,31 @@ export async function fetchGitHubWithCache<T>(
     }
   }
 
-  // 2. Prepare HTTP headers
+  // 2. Check L2 PostgreSQL ApiCache (persistent across serverless restarts)
+  if (!options?.forceRefresh && !cached) {
+    try {
+      const dbCache = await prisma.apiCache.findUnique({
+        where: { key: url },
+      });
+      if (dbCache) {
+        cached = {
+          etag: dbCache.etag,
+          data: dbCache.data as T,
+          timestamp: dbCache.updatedAt.getTime(),
+        };
+        gitHubCache.set(url, cached);
+
+        const ageMs = Date.now() - cached.timestamp;
+        if (ageMs < revalidateMs) {
+          return cached.data;
+        }
+      }
+    } catch (dbErr) {
+      console.warn("[CachedFetch] Database L2 cache read error:", dbErr);
+    }
+  }
+
+  // 3. Prepare HTTP headers
   const authToken = options?.token || process.env.GITHUB_TOKEN;
   const headers: Record<string, string> = {
     Accept: "application/vnd.github+json",
@@ -61,7 +86,7 @@ export async function fetchGitHubWithCache<T>(
     headers.Authorization = `Bearer ${authToken}`;
   }
 
-  // 3. Attach ETag for 304 conditional request (does not consume API quota)
+  // 4. Attach ETag for 304 conditional request (does not consume API quota)
   if (cached?.etag && !options?.forceRefresh) {
     headers["If-None-Match"] = cached.etag;
   }
@@ -72,18 +97,28 @@ export async function fetchGitHubWithCache<T>(
       cache: "no-store",
     });
 
-    // 4. Handle 304 Not Modified: Reuse cached data without consuming quota
+    // 5. Handle 304 Not Modified: Reuse cached data without consuming quota
     if (res.status === 304 && cached) {
-      cached.timestamp = Date.now(); // refresh TTL
+      cached.timestamp = Date.now();
+      gitHubCache.set(url, cached);
+
+      // Refresh DB timestamp in background
+      prisma.apiCache
+        .update({
+          where: { key: url },
+          data: { updatedAt: new Date() },
+        })
+        .catch(() => {});
+
       return cached.data;
     }
 
-    // 5. Handle 404 Not Found
+    // 6. Handle 404 Not Found
     if (res.status === 404) {
       return null;
     }
 
-    // 6. Handle Rate Limiting (403 or 429)
+    // 7. Handle Rate Limiting (403 or 429)
     if (res.status === 403 || res.status === 429) {
       const remaining = res.headers.get("x-ratelimit-remaining");
       const reset = res.headers.get("x-ratelimit-reset");
@@ -100,11 +135,6 @@ export async function fetchGitHubWithCache<T>(
           `GitHub API rate limit exceeded (${remaining}/${limit} remaining). Quota resets at ${resetTimeFormatted}. Set GITHUB_TOKEN in your environment to increase baseline limit to 5,000 req/hr.`
         );
       }
-
-      const bodyText = await res.text().catch(() => "");
-      throw new Error(
-        `GitHub API access forbidden [403]: ${bodyText || "Ensure your token has repository read permissions."}`
-      );
     }
 
     if (!res.ok) {
@@ -113,27 +143,45 @@ export async function fetchGitHubWithCache<T>(
       return null;
     }
 
-    // 7. Parse response and store ETag
+    // 8. Parse response and store in L1 and L2
     const data: T = options?.isText
       ? ((await res.text()) as unknown as T)
       : ((await res.json()) as T);
 
     const etag = res.headers.get("etag");
 
-    gitHubCache.set(url, {
+    const entry: CacheEntry<T> = {
       etag,
       data,
       timestamp: Date.now(),
-    });
+    };
+
+    gitHubCache.set(url, entry);
+
+    // Persist to Supabase PostgreSQL ApiCache table
+    try {
+      await prisma.apiCache.upsert({
+        where: { key: url },
+        update: {
+          etag,
+          data: (options?.isText ? { text: data } : data) as any,
+        },
+        create: {
+          key: url,
+          etag,
+          data: (options?.isText ? { text: data } : data) as any,
+        },
+      });
+    } catch (persistErr) {
+      console.warn("[CachedFetch] Failed to persist to ApiCache table:", persistErr);
+    }
 
     return data;
   } catch (error) {
-    // If rate-limited error, bubble it up so admin UI/logs know specifically
     if (error instanceof Error && error.message.includes("rate limit")) {
       throw error;
     }
 
-    // If network error occurred but we have a cached version, serve stale as graceful fallback
     if (cached) {
       console.warn(`[CachedFetch] Network error fetching ${url}; serving stale cached data.`, error);
       return cached.data;
@@ -144,16 +192,10 @@ export async function fetchGitHubWithCache<T>(
   }
 }
 
-/**
- * Clear in-memory cache store
- */
 export function clearGitHubCache(): void {
   gitHubCache.clear();
 }
 
-/**
- * Get current cache statistics
- */
 export function getGitHubCacheStats(): { size: number; urls: string[] } {
   return {
     size: gitHubCache.size,

@@ -4,6 +4,8 @@ import Link from "next/link";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 import { getSession } from "@/lib/auth/session";
 import { writeClient } from "@/lib/sanity/write-client";
+import { prisma } from "@/lib/prisma";
+import { mapPrismaToAdminProject } from "@/lib/services/project-service";
 import { ProjectFullPageEditor } from "@/components/admin/project-full-page-editor";
 import { NotFoundDraftGenerator } from "@/components/admin/not-found-draft-generator";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
@@ -39,79 +41,52 @@ export default async function ProjectEditorPage({ params }: ProjectEditorPagePro
   let project: SanityProject | null = null;
 
   try {
-    const docs = await writeClient.fetch<SanityProject[]>(
-      `*[_type == "project" && (_id == $id || _id == $draftId || slug.current == $id || github match $id || title.en == $id)] | order(_updatedAt desc){
-        _id,
-        _createdAt,
-        _updatedAt,
-        title,
-        slug,
-        description,
-        technologies,
-        github,
-        demo,
-        featured,
-        content,
-        aiContextDigest,
-        rawLanguages,
-        "languages": languages[]{
-          _key,
-          name,
-          percentage,
-          color,
-          bytes
-        },
-        "isDraft": string::startsWith(_id, "drafts."),
-        "image": select(
-          defined(image.asset->url) => { "_id": image.asset->_id, "url": image.asset->url, "_ref": image.asset->_id },
-          defined(image.asset.url) => { "_id": image.asset._id, "url": image.asset.url, "_ref": image.asset._ref },
-          null
-        ),
-        coverImage{
-          alt,
-          _type,
-          "asset": select(
-            defined(asset->url) => { "_id": asset->_id, "url": asset->url, "_ref": asset->_id },
-            defined(asset.url) => { "_id": asset._id, "url": asset.url, "_ref": asset._ref },
-            null
-          )
-        },
-        gallery[]{
-          alt,
-          caption,
-          _key,
-          _type,
-          "asset": select(
-            defined(asset->url) => { "_id": asset->_id, "url": asset->url, "_ref": asset->_id },
-            defined(asset.url) => { "_id": asset._id, "url": asset.url, "_ref": asset._ref },
-            null
-          )
-        },
-        video{
-          enabled,
-          url,
-          "asset": select(
-            defined(asset->url) => { "_id": asset->_id, "url": asset->url },
-            defined(asset.url) => { "_id": asset._id, "url": asset.url },
-            null
-          )
-        },
-        previewGif{
-          alt,
-          "asset": select(
-            defined(asset->url) => { "_id": asset->_id, "url": asset->url },
-            defined(asset.url) => { "_id": asset._id, "url": asset.url },
-            null
-          )
-        }
-      }`,
-      { id: decodedId, draftId }
-    );
+    const cleanId = decodedId.replace(/^drafts\./, "");
+    const dbProject = await prisma.project.findFirst({
+      where: {
+        OR: [
+          { id: cleanId },
+          { slug: cleanId },
+          { githubUrl: { contains: cleanId } },
+          { title: cleanId },
+        ],
+      },
+    });
 
-    // Prioritize draft document if available, then fallback to most recent document
-    project = docs.find((d) => d._id.startsWith("drafts.")) || docs[0] || null;
+    if (dbProject) {
+      project = mapPrismaToAdminProject(dbProject) as SanityProject;
+    } else {
+      // Fallback to Sanity if not yet in database
+      const docs = await writeClient.fetch<SanityProject[]>(
+        `*[_type == "project" && (_id == $id || _id == $draftId || slug.current == $id || github match $id || title.en == $id)] | order(_updatedAt desc){
+          _id,
+          _createdAt,
+          _updatedAt,
+          title,
+          slug,
+          description,
+          technologies,
+          github,
+          demo,
+          featured,
+          content,
+          aiContextDigest,
+          rawLanguages,
+          "languages": languages[]{
+            _key,
+            name,
+            percentage,
+            color,
+            bytes
+          },
+          "isDraft": string::startsWith(_id, "drafts.")
+        }`,
+        { id: decodedId, draftId }
+      );
+      project = docs.find((d) => d._id.startsWith("drafts.")) || docs[0] || null;
+    }
   } catch (err) {
-    console.error("[ProjectEditorPage] Error querying Sanity project:", err);
+    console.error("[ProjectEditorPage] Error querying project:", err);
   }
 
   // Check if repository is private on GitHub

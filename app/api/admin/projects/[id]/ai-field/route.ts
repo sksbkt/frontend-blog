@@ -7,6 +7,7 @@ import {
 } from "@/lib/gemini/analyzer";
 import { isRateLimitOrCapacityError } from "@/lib/gemini/queue";
 import { writeClient } from "@/lib/sanity/write-client";
+import { prisma } from "@/lib/prisma";
 import type { AiContextDigest } from "@/components/admin/types";
 
 interface RouteParams {
@@ -47,25 +48,36 @@ export async function POST(request: Request, { params }: RouteParams) {
       clientDigest?: AiContextDigest;
     };
 
-    // 1. Retrieve aiContextDigest from client state or from Sanity document
+    // 1. Retrieve aiContextDigest from client state or from Prisma database
     let digest: AiContextDigest | undefined = clientDigest;
 
     if (!digest || (!digest.rawDigest && !digest.summary)) {
-      const docs = await writeClient.fetch<
-        Array<{ _id: string; aiContextDigest?: AiContextDigest }>
-      >(
-        `*[_type == "project" && (_id == $id || _id == $draftId || slug.current == $id || title.en == $id)] | order(_updatedAt desc){ _id, aiContextDigest }`,
-        { id: decodedId, draftId }
-      );
-      const doc =
-        docs.find(
-          (d) =>
-            d._id.startsWith("drafts.") &&
-            (d.aiContextDigest?.rawDigest || d.aiContextDigest?.summary)
-        ) ||
-        docs.find((d) => d.aiContextDigest?.rawDigest || d.aiContextDigest?.summary) ||
-        docs[0];
-      digest = doc?.aiContextDigest;
+      const cleanId = decodedId.replace(/^drafts\./, "");
+      const dbProject = await prisma.project.findFirst({
+        where: {
+          OR: [{ id: cleanId }, { slug: cleanId }],
+        },
+      });
+
+      if (dbProject?.aiContextDigest) {
+        digest = dbProject.aiContextDigest as AiContextDigest;
+      } else {
+        const docs = await writeClient.fetch<
+          Array<{ _id: string; aiContextDigest?: AiContextDigest }>
+        >(
+          `*[_type == "project" && (_id == $id || _id == $draftId || slug.current == $id || title.en == $id)] | order(_updatedAt desc){ _id, aiContextDigest }`,
+          { id: decodedId, draftId }
+        );
+        const doc =
+          docs.find(
+            (d) =>
+              d._id.startsWith("drafts.") &&
+              (d.aiContextDigest?.rawDigest || d.aiContextDigest?.summary)
+          ) ||
+          docs.find((d) => d.aiContextDigest?.rawDigest || d.aiContextDigest?.summary) ||
+          docs[0];
+        digest = doc?.aiContextDigest;
+      }
     }
 
     // 2. Enforce dossier presence

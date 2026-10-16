@@ -1,0 +1,81 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Project {
+  id              String   @id @default(cuid())
+  slug            String   @unique
+  title           String
+
+  // Bilingual Fields
+  taglineEn       String
+  taglineFa       String
+  descriptionEn   String   @db.Text
+  descriptionFa   String   @db.Text
+
+  // Metadata, URLs & Layout
+  coverImageUrl   String?
+  githubUrl       String?
+  liveUrl         String?
+  order           Int      @default(0)
+  isPublished     Boolean  @default(false)
+  featured        Boolean  @default(false)
+
+  // Technical Stack & GitHub Breakdown
+  technologies    String[]
+  // GitHub languages: [{ name: "TypeScript", percentage: 72.4, color: "#3178c6", bytes: 142000 }]
+  languages       Json?    @default("[]")
+
+  // SCA Deep Scan Dossier (complete repo topology, manifests, commit friction, summaries)
+  aiContextDigest Json?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([slug])
+  @@index([isPublished])
+}
+
+model TechDefinition {
+  id          String   @id @default(cuid())
+  slug        String   @unique // Canonical slug: "react", "nextjs", "tailwind-css"
+  name        String   // Canonical display name: "React", "Next.js", "Tailwind CSS"
+  aliases     String[] @default([]) // ["reactjs", "react.js", "react-js"]
+  icon        String?  // SimpleIcons slug, Lucide icon name, or custom SVG path
+  summaryEn   String   @db.Text
+  summaryFa   String   @db.Text
+  category    String?  // "frontend", "backend", "devops", "database", etc.
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([slug])
+}
+
+// Persistent ETag & Gemini caching (eliminates serverless memory loss)
+model ApiCache {
+  key       String   @id
+  etag      String?
+  data      Json
+  updatedAt DateTime @updatedAt
+}
+
+// 14-day TTL CDN Asset Cache (e.g. GitHub OpenGraph images stored in Supabase Storage)
+model AssetCache {
+  id          String   @id @default(cuid())
+  key         String   @unique // e.g. "github-og:owner/repo"
+  storageUrl  String   // Permanent Supabase Storage public CDN URL
+  contentType String   @default("image/png")
+  expiresAt   DateTime // Date.now() + 14 days
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([key])
+  @@index([expiresAt])
+}
+

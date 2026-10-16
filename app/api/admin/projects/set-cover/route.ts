@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { getSession } from "@/lib/auth/session";
-import { writeClient } from "@/lib/sanity/write-client";
+import { prisma } from "@/lib/prisma";
+import { uploadProjectImage } from "@/lib/supabase";
 
 export async function POST(request: Request) {
   const session = await getSession();
@@ -24,125 +25,79 @@ export async function POST(request: Request) {
       );
     }
 
-    let finalAssetId = imageAssetId;
+    const cleanId = projectId.replace(/^drafts\./, "");
+    let resolvedCoverUrl = imageUrl || imageAssetId;
 
-    // If an external URL is passed (e.g. GitHub raw URL or remote asset) without an existing Sanity asset ID:
-    if (!finalAssetId && imageUrl && typeof imageUrl === "string") {
+    // If an external URL is passed without already being in Supabase Storage, download and persist to Supabase
+    if (imageUrl && typeof imageUrl === "string" && /^https?:\/\//i.test(imageUrl) && !imageUrl.includes("supabase.co")) {
       try {
         let res = await fetch(imageUrl, {
           headers: {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
           },
         });
 
-        // If direct fetch fails (e.g. GitHub OpenGraph anti-bot 429), leverage Next.js image optimizer proxy
-        if (!res.ok && (imageUrl.includes("opengraph.githubassets.com") || imageUrl.includes("github"))) {
-          try {
-            const optimizerUrl = new URL(
-              `/_next/image?url=${encodeURIComponent(imageUrl)}&w=1200&q=75`,
-              request.url
-            ).toString();
-            const optRes = await fetch(optimizerUrl);
-            if (optRes.ok) {
-              res = optRes;
-            }
-          } catch {}
+        if (res.ok) {
+          const blob = await res.blob();
+          const file = new File([blob], `cover-${cleanId}.png`, { type: blob.type || "image/png" });
+          const uploadedUrl = await uploadProjectImage(file, cleanId);
+          if (uploadedUrl) {
+            resolvedCoverUrl = uploadedUrl;
+          }
         }
-
-        if (!res.ok) {
-          throw new Error(`Failed to download remote asset from: ${imageUrl}`);
-        }
-
-        const buffer = Buffer.from(await res.arrayBuffer());
-        const filename = imageUrl.split("/").pop()?.split("?")[0] || `cover-${Date.now()}.png`;
-
-        const uploaded = await writeClient.assets.upload("image", buffer, {
-          filename,
-        });
-
-        if (uploaded?._id) {
-          finalAssetId = uploaded._id;
-        }
-      } catch (err: unknown) {
-        console.error("[Set-Cover] Error uploading image to Sanity:", err);
-        return NextResponse.json(
-          {
-            success: false,
-            message: err instanceof Error ? err.message : "Failed to upload image buffer to Sanity.",
-          },
-          { status: 500 }
-        );
+      } catch (err) {
+        console.warn("[Set-Cover] Warning persisting remote image to Supabase Storage, using direct URL:", err);
       }
     }
 
-    if (!finalAssetId) {
+    if (!resolvedCoverUrl) {
       return NextResponse.json(
-        { success: false, message: "A valid Sanity asset ID or downloadable image URL is required." },
+        { success: false, message: "A valid image URL is required." },
         { status: 400 }
       );
     }
 
-    // Format strict Sanity Image Reference Object
+    // Update Project in PostgreSQL via Prisma
+    const existing = await prisma.project.findFirst({
+      where: {
+        OR: [{ id: cleanId }, { slug: cleanId }],
+      },
+    });
+
+    let updatedProject = null;
+    if (existing) {
+      updatedProject = await prisma.project.update({
+        where: { id: existing.id },
+        data: {
+          coverImageUrl: resolvedCoverUrl,
+        },
+      });
+
+      try {
+        revalidateTag("projects", "max");
+        revalidateTag(`project:${existing.id}`, "max");
+        revalidateTag(`project:${existing.slug}`, "max");
+      } catch {}
+    }
+
     const formattedCoverRef = {
       _type: "image",
       alt: alt || "Cover Image",
       asset: {
-        _type: "reference",
-        _ref: finalAssetId,
+        _id: resolvedCoverUrl,
+        url: resolvedCoverUrl,
       },
     };
 
-    // Prepare patch: update coverImage and legacy image
-    const patch = writeClient
-      .patch(projectId)
-      .set({
-        coverImage: formattedCoverRef,
-        image: formattedCoverRef,
-      });
-
-    // If project doesn't have this asset in gallery, append it to media assets
-    const projectDoc = await writeClient.getDocument(projectId);
-    const existingGallery = (projectDoc?.gallery || []) as Array<{
-      asset?: { _ref?: string; _id?: string };
-    }>;
-    const alreadyInGallery = existingGallery.some(
-      (item) => item.asset?._ref === finalAssetId || item.asset?._id === finalAssetId
-    );
-
-    if (!alreadyInGallery) {
-      patch.setIfMissing({ gallery: [] }).append("gallery", [
-        {
-          _key: `media-${Date.now()}`,
-          _type: "galleryImage",
-          caption: alt || "Project Media Asset",
-          alt: alt || "Project Media Asset",
-          asset: {
-            _type: "reference",
-            _ref: finalAssetId,
-          },
-        },
-      ]);
-    }
-
-    const updated = await patch.commit();
-
-    // Invalidate Next.js cache tags for live views
-    revalidateTag("projects", "max");
-    revalidateTag(`project:${projectId}`, "max");
-    const updatedSlug = (updated as { slug?: { current?: string } })?.slug?.current;
-    if (updatedSlug) {
-      revalidateTag(`project:${updatedSlug}`, "max");
-    }
-
     return NextResponse.json({
       success: true,
-      message: "Cover image successfully updated in Sanity CMS.",
+      message: "Cover image successfully updated in Supabase PostgreSQL.",
       coverImage: formattedCoverRef,
-      assetId: finalAssetId,
-      project: updated,
+      assetId: resolvedCoverUrl,
+      project: updatedProject,
     });
   } catch (error) {
-    console.error("[Set-Cover] Mutation error:", error);
+    console.error("[Set-Cover] Error:", error);
     return NextResponse.json(
       {
         success: false,

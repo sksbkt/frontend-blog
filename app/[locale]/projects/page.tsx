@@ -1,9 +1,7 @@
 import { getLocale, getTranslations } from "next-intl/server";
 
 import ProjectsExplorer from "@/components/projects/projects-explorer";
-import { client } from "@/lib/sanity/client";
-import { mapSanityProject } from "@/lib/sanity/mappers";
-import { allProjectsQuery, getProjects } from "@/lib/sanity/queries";
+import { getDbProjects } from "@/lib/services/project-service";
 
 type ProjectsPageProps = {
   searchParams: Promise<{
@@ -58,11 +56,7 @@ export default async function ProjectsPage({
       ? [technologyParam.trim()]
       : [];
 
-  const sanityProjects = (await getProjects()) as Parameters<
-    typeof mapSanityProject
-  >[0][];
-
-  const projects = sanityProjects.map(mapSanityProject);
+  const projects = await getDbProjects();
 
   return (
     <main className="py-20">
