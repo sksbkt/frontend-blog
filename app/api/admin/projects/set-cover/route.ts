@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
-import { uploadProjectImage } from "@/lib/supabase";
+import { ensureSovereignAsset } from "@/lib/asset-pipeline";
 
 export async function POST(request: Request) {
   const session = await getSession();
@@ -16,7 +16,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { projectId, imageAssetId, imageUrl, alt } = body;
+    const { projectId, imageAssetId, imageUrl, alt, lowResUrl } = body;
 
     if (!projectId || typeof projectId !== "string") {
       return NextResponse.json(
@@ -26,35 +26,44 @@ export async function POST(request: Request) {
     }
 
     const cleanId = projectId.replace(/^drafts\./, "");
-    let resolvedCoverUrl = imageUrl || imageAssetId;
+    const rawCoverUrl = imageUrl || imageAssetId;
 
-    // If an external URL is passed without already being in Supabase Storage, download and persist to Supabase
-    if (imageUrl && typeof imageUrl === "string" && /^https?:\/\//i.test(imageUrl) && !imageUrl.includes("supabase.co")) {
-      try {
-        let res = await fetch(imageUrl, {
-          headers: {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-          },
-        });
-
-        if (res.ok) {
-          const blob = await res.blob();
-          const file = new File([blob], `cover-${cleanId}.png`, { type: blob.type || "image/png" });
-          const uploadedUrl = await uploadProjectImage(file, cleanId);
-          if (uploadedUrl) {
-            resolvedCoverUrl = uploadedUrl;
-          }
-        }
-      } catch (err) {
-        console.warn("[Set-Cover] Warning persisting remote image to Supabase Storage, using direct URL:", err);
-      }
-    }
-
-    if (!resolvedCoverUrl) {
+    if (!rawCoverUrl || typeof rawCoverUrl !== "string") {
       return NextResponse.json(
         { success: false, message: "A valid image URL is required." },
         { status: 400 }
       );
+    }
+
+    // If the image is already in Supabase Storage, keep its exact sovereign URL
+    let resolvedCoverUrl = rawCoverUrl;
+    if (!rawCoverUrl.includes("supabase.co/storage/v1/object/public/projects/")) {
+      resolvedCoverUrl = await ensureSovereignAsset(rawCoverUrl, {
+        folder: "covers",
+        customFileName: `cover-${cleanId}-${Date.now().toString(36)}.png`,
+      });
+    }
+
+    if (!resolvedCoverUrl) {
+      return NextResponse.json(
+        { success: false, message: "Failed to ingest sovereign asset." },
+        { status: 500 }
+      );
+    }
+
+    // Determine assetSource and lowResCoverUrl
+    const assetSource = resolvedCoverUrl.includes("/github-og/")
+      ? "GITHUB_OG"
+      : resolvedCoverUrl.includes("/captures/")
+      ? "GITHUB_ACTION_CAPTURE"
+      : "USER_UPLOAD";
+
+    let finalLowRes = lowResUrl || null;
+    if (!finalLowRes) {
+      const cacheRow = await prisma.assetCache.findFirst({
+        where: { highResUrl: resolvedCoverUrl },
+      });
+      if (cacheRow?.lowResUrl) finalLowRes = cacheRow.lowResUrl;
     }
 
     // Update Project in PostgreSQL via Prisma
@@ -70,6 +79,8 @@ export async function POST(request: Request) {
         where: { id: existing.id },
         data: {
           coverImageUrl: resolvedCoverUrl,
+          lowResCoverUrl: finalLowRes,
+          assetSource,
         },
       });
 

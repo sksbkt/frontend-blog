@@ -77,9 +77,25 @@ export async function POST(request: Request) {
       );
     }
 
+    if (aiResult.draft?.id && auditResult) {
+      try {
+        const { prisma } = await import("@/lib/prisma");
+        await prisma.project.update({
+          where: { id: aiResult.draft.id },
+          data: {
+            auditScore: auditResult.overallScore,
+            auditBreakdown: auditResult as any,
+            auditedAt: new Date(),
+          },
+        });
+      } catch (err) {
+        console.warn("[Generate] Non-critical warning updating project audit info:", err);
+      }
+    }
+
     return NextResponse.json({
       success: true,
-      message: "Repository successfully analyzed and draft created in Sanity!",
+      message: "Repository successfully analyzed and draft saved to database!",
       project: aiResult.project,
       draft: aiResult.draft,
       audit: auditResult,

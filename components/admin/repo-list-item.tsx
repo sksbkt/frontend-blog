@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { CustomTooltip } from "@/components/ui/custom-tooltip";
+import { ProjectAuditBadge } from "@/components/projects/project-audit-badge";
 import type { RepositoryItem, RepoAuditItem, SanityProject } from "./types";
 
 interface RepoListItemProps {
@@ -47,10 +48,20 @@ export function RepoListItem({
         : "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/30"
       : null;
 
+  const projectRecord = matchingPublished || matchingDraft;
+  const displayTitle = projectRecord?.title?.en?.trim() || projectRecord?.title?.fa?.trim() || repo.name;
+
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={() => onSelect(repo)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect(repo);
+        }
+      }}
       className={`w-full text-start p-3 sm:p-3.5 rounded-xl border transition-all duration-150 flex flex-col gap-2 min-h-[44px] cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary/40 select-none ${
         isSelected
           ? "bg-muted border-primary shadow-md ring-1 ring-primary/40 text-foreground"
@@ -70,28 +81,32 @@ export function RepoListItem({
           <span
             dir="ltr"
             className="font-bold text-sm text-foreground truncate font-sans text-left"
+            title={displayTitle}
           >
-            {repo.name}
+            {displayTitle}
           </span>
         </div>
 
-        {score !== undefined ? (
-          <CustomTooltip content={`Architecture Audit Score: ${score}/100`} side="top">
-            <span
-              dir="ltr"
-              className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-md border shrink-0 tabular-nums ${scoreClass}`}
-            >
-              {score}
-            </span>
-          </CustomTooltip>
-        ) : (
-          <span
-            dir="ltr"
-            className="text-[10px] font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded border border-border shrink-0 tabular-nums"
-          >
-            --
-          </span>
-        )}
+        <div
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+        >
+          <ProjectAuditBadge
+            project={{
+              id: (matchingPublished || matchingDraft)?._id || repo.name,
+              slug: (matchingPublished || matchingDraft)?.slug?.current || repo.name,
+              auditScore:
+                typeof (matchingPublished || matchingDraft)?.auditScore === "number"
+                  ? (matchingPublished || matchingDraft)?.auditScore
+                  : score ?? null,
+              auditBreakdown: (matchingPublished || matchingDraft)?.auditBreakdown ?? null,
+              auditedAt: (matchingPublished || matchingDraft)?.auditedAt ?? null,
+            }}
+            isAdmin={true}
+          />
+        </div>
       </div>
 
       {/* Middle row: 1-line truncated description */}
@@ -154,6 +169,6 @@ export function RepoListItem({
           )}
         </div>
       </div>
-    </button>
+    </div>
   );
 }

@@ -93,7 +93,7 @@ export type AiContextDigest = {
   lastAnalyzedAt?: string;
 };
 
-export type SanityProject = {
+export type AdminProject = {
   _id: string;
   _createdAt: string;
   _updatedAt: string;
@@ -114,7 +114,12 @@ export type SanityProject = {
   aiContextDigest?: AiContextDigest;
   rawLanguages?: Record<string, number> | string;
   languages?: import("@/lib/github/languages").ProjectLanguageItem[];
+  auditScore?: number | null;
+  auditBreakdown?: any;
+  auditedAt?: string | null;
 };
+
+export type SanityProject = AdminProject;
 
 export type EnvVariableDef = {
   key: string;

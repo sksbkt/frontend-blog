@@ -34,6 +34,7 @@ import { ProjectThumbnail } from "./project-thumbnail";
 import { RepoActionsMenu } from "./repo-actions-menu";
 import { LanguageBar } from "@/components/ui/language-bar";
 import { TechBadgeGroup } from "@/components/ui/tech-badge-group";
+import { ProjectAuditBadge } from "@/components/projects/project-audit-badge";
 import type {
   RepositoryItem,
   RepoAuditItem,
@@ -54,6 +55,7 @@ interface CommandDeckDetailProps {
   isDeployingVercel: boolean;
   isCiCapturing: boolean;
   isSyncingAssets: boolean;
+  isImporting?: boolean;
   onAnalyze: (repoFullName: string) => void;
   onAudit: (repoFullName: string) => void;
   onDeployVercelModal: (repoFullName: string, envVars?: EnvVariableDef[]) => void;
@@ -61,6 +63,7 @@ interface CommandDeckDetailProps {
   onSyncAssets: (repoFullName: string, projectId?: string) => void;
   onOpenPushModal: (config: PushReadmeConfig) => void;
   onEditProject: (project: SanityProject) => void;
+  onImportToLab?: (repoFullName: string) => void;
 }
 
 export function CommandDeckDetail({
@@ -75,6 +78,7 @@ export function CommandDeckDetail({
   isDeployingVercel,
   isCiCapturing,
   isSyncingAssets,
+  isImporting = false,
   onAnalyze,
   onAudit,
   onDeployVercelModal,
@@ -82,6 +86,7 @@ export function CommandDeckDetail({
   onSyncAssets,
   onOpenPushModal,
   onEditProject,
+  onImportToLab,
 }: CommandDeckDetailProps) {
   const t = useTranslations("admin.masterDetail");
   const [activeTab, setActiveTab] = useState<"overview" | "audit" | "deployment" | "gallery">(
@@ -185,8 +190,9 @@ export function CommandDeckDetail({
               <h2
                 dir="ltr"
                 className="text-lg sm:text-xl font-bold text-foreground truncate font-sans text-left"
+                title={projectRecord?.title?.en?.trim() || projectRecord?.title?.fa?.trim() || repo.name}
               >
-                {repo.name}
+                {projectRecord?.title?.en?.trim() || projectRecord?.title?.fa?.trim() || repo.name}
               </h2>
 
               <span
@@ -197,14 +203,26 @@ export function CommandDeckDetail({
                 <span>{repo.defaultBranch || "main"}</span>
               </span>
 
-              {score !== undefined && (
-                <span
-                  dir="ltr"
-                  className={`text-xs font-mono font-bold px-2 py-0.5 rounded-full border tabular-nums shrink-0 ${scoreClass}`}
-                >
-                  Score: {score}/100
-                </span>
-              )}
+              <div
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+              >
+                <ProjectAuditBadge
+                  project={{
+                    id: projectRecord?._id || repo.name,
+                    slug: projectRecord?.slug?.current || repo.name,
+                    auditScore:
+                      typeof projectRecord?.auditScore === "number"
+                        ? projectRecord.auditScore
+                        : score ?? null,
+                    auditBreakdown: projectRecord?.auditBreakdown ?? null,
+                    auditedAt: projectRecord?.auditedAt ?? null,
+                  }}
+                  isAdmin={true}
+                />
+              </div>
             </div>
 
             <p
@@ -218,6 +236,29 @@ export function CommandDeckDetail({
 
           {/* Primary Quick Actions Bar */}
           <div className="flex items-center gap-2 shrink-0">
+            {/* Explicit Import to Lab Action for un-imported repos */}
+            {repo.importStatus === "none" && onImportToLab && (
+              <button
+                type="button"
+                onClick={() => onImportToLab(repo.fullName)}
+                disabled={isImporting}
+                className="h-10 px-3.5 inline-flex items-center justify-center gap-1.5 text-xs font-bold rounded-xl shadow-xs transition-all active:scale-[0.98] bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+                title="Directly import repository into PostgreSQL database with sovereign cover image"
+              >
+                {isImporting ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0" />
+                    <span>Importing...</span>
+                  </>
+                ) : (
+                  <>
+                    <UploadCloud className="w-3.5 h-3.5 shrink-0" />
+                    <span>Import to Lab</span>
+                  </>
+                )}
+              </button>
+            )}
+
             {/* Primary Action: AI Generate Draft */}
             <button
               type="button"
@@ -226,6 +267,8 @@ export function CommandDeckDetail({
               className={`h-10 px-3.5 inline-flex items-center justify-center gap-1.5 text-xs font-bold rounded-xl shadow-xs transition-all active:scale-[0.98] ${
                 isAnalyzing
                   ? "bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/40 cursor-wait"
+                  : repo.importStatus === "none"
+                  ? "bg-muted text-foreground border border-border hover:bg-muted/80"
                   : "bg-primary text-primary-foreground hover:bg-primary/90"
               }`}
             >
@@ -268,12 +311,14 @@ export function CommandDeckDetail({
               isAuditing={isAuditing}
               isDeployingVercel={isDeployingVercel}
               isCiCapturing={isCiCapturing}
+              isImporting={isImporting}
               onAnalyze={() => onAnalyze(repo.fullName)}
               onAudit={() => onAudit(repo.fullName)}
               onDeployVercel={() =>
                 onDeployVercelModal(repo.fullName, auditData?.envVariables)
               }
               onCaptureAssets={() => onDeployAssetRunner(repo.fullName)}
+              onImportToLab={onImportToLab ? () => onImportToLab(repo.fullName) : undefined}
             />
           </div>
         </div>

@@ -15,6 +15,7 @@ import {
   Globe,
   Layers,
   Edit3,
+  UploadCloud,
 } from "lucide-react";
 import { FaGithub as Github } from "react-icons/fa";
 import { useTranslations } from "next-intl";
@@ -23,6 +24,7 @@ import { RepoActionsMenu } from "./repo-actions-menu";
 import { TechBadgeGroup } from "@/components/ui/tech-badge-group";
 import { LanguageBar } from "@/components/ui/language-bar";
 import { CustomTooltip } from "@/components/ui/custom-tooltip";
+import { ProjectAuditBadge } from "@/components/projects/project-audit-badge";
 import type {
   RepositoryItem,
   RepoAuditItem,
@@ -40,12 +42,14 @@ interface RepoGridProps {
   auditingRepo: string | null;
   deployingAssetRunner: string | null;
   isDeployingVercel: boolean;
+  importingRepo?: string | null;
   onSelectRepo?: (repo: RepositoryItem) => void;
   onAnalyze: (fullName: string) => void;
   onAudit: (fullName: string) => void;
   onDeployVercelModal: (fullName: string, envVars?: EnvVariableDef[]) => void;
   onDeployAssetRunner: (fullName: string) => void;
   onEditProject?: (project: SanityProject) => void;
+  onImportToLab?: (fullName: string) => void;
 }
 
 export function RepoGrid({
@@ -58,10 +62,12 @@ export function RepoGrid({
   auditingRepo,
   deployingAssetRunner,
   isDeployingVercel,
+  importingRepo,
   onAnalyze,
   onAudit,
   onDeployVercelModal,
   onDeployAssetRunner,
+  onImportToLab,
 }: RepoGridProps) {
   const router = useRouter();
   const t = useTranslations("admin.masterDetail");
@@ -83,12 +89,22 @@ export function RepoGrid({
         const auditItem = repoAudits[repo.fullName.toLowerCase()];
         const score = auditItem?.audit?.overallScore;
         const matchingPub = published.find(
-          (p) => p.github && p.github.toLowerCase().includes(repo.fullName.toLowerCase())
+          (p) =>
+            (p.github && p.github.toLowerCase().includes(repo.fullName.toLowerCase())) ||
+            (p.github && p.github.toLowerCase().includes(repo.name.toLowerCase())) ||
+            p.slug?.current?.toLowerCase() === repo.name.toLowerCase()
         );
         const matchingDraft = drafts.find(
-          (d) => d.github && d.github.toLowerCase().includes(repo.fullName.toLowerCase())
+          (d) =>
+            (d.github && d.github.toLowerCase().includes(repo.fullName.toLowerCase())) ||
+            (d.github && d.github.toLowerCase().includes(repo.name.toLowerCase())) ||
+            d.slug?.current?.toLowerCase() === repo.name.toLowerCase()
         );
         const projectRecord = matchingPub || matchingDraft;
+        const displayTitle =
+          (locale === "fa"
+            ? projectRecord?.title?.fa?.trim() || projectRecord?.title?.en?.trim()
+            : projectRecord?.title?.en?.trim() || projectRecord?.title?.fa?.trim()) || repo.name;
         const isAnalyzing = analyzingRepo === repo.fullName;
         const isAuditing = auditingRepo === repo.fullName;
         const isCiCapturing = deployingAssetRunner === repo.fullName;
@@ -129,7 +145,7 @@ export function RepoGrid({
                   }
                   sanityGifUrl={projectRecord?.previewGif?.asset?.url}
                   showGif={Boolean(projectRecord?.previewGif?.asset?.url)}
-                  alt={repo.name}
+                  alt={displayTitle}
                   aspectRatio="aspect-video"
                   badge={
                     repo.isPrivate ? (
@@ -152,11 +168,11 @@ export function RepoGrid({
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <h3
-                    dir="ltr"
+                    dir={locale === "fa" && projectRecord?.title?.fa ? "rtl" : "ltr"}
                     className="font-bold text-base text-foreground truncate font-sans text-left group-hover:text-primary transition-colors"
-                    title={repo.name}
+                    title={displayTitle}
                   >
-                    {repo.name}
+                    {displayTitle}
                   </h3>
                   <p
                     dir="ltr"
@@ -166,20 +182,28 @@ export function RepoGrid({
                   </p>
                 </div>
 
-                {score !== undefined && (
-                  <div
-                    className="flex items-center gap-1.5 shrink-0"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <span
-                      dir="ltr"
-                      className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-md border tabular-nums ${scoreClass}`}
-                      title={`Audit Score: ${score}/100`}
-                    >
-                      {score}
-                    </span>
-                  </div>
-                )}
+                <div
+                  className="flex items-center gap-1.5 shrink-0"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                >
+                  <ProjectAuditBadge
+                    project={{
+                      id: projectRecord?._id || repo.name,
+                      slug: projectRecord?.slug?.current || repo.name,
+                      auditScore:
+                        typeof projectRecord?.auditScore === "number"
+                          ? projectRecord.auditScore
+                          : score ?? null,
+                      auditBreakdown: projectRecord?.auditBreakdown ?? null,
+                      auditedAt: projectRecord?.auditedAt ?? null,
+                    }}
+                    isAdmin={true}
+                    locale={locale}
+                  />
+                </div>
               </div>
 
               {/* Description */}
@@ -336,20 +360,46 @@ export function RepoGrid({
                   </button>
                 </CustomTooltip>
 
-                {/* Primary Button: Edit */}
-                <CustomTooltip content="Edit project" side="top">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleCardClick();
-                    }}
-                    className="h-9 px-3 flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-bold rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs transition-all active:scale-[0.98]"
-                  >
-                    <Edit3 className="w-3.5 h-3.5" />
-                    <span>Edit</span>
-                  </button>
-                </CustomTooltip>
+                {/* Primary Button: Import to Lab or Edit */}
+                {repo.importStatus === "none" && onImportToLab ? (
+                  <CustomTooltip content="Directly import repository into PostgreSQL with sovereign cover asset" side="top">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onImportToLab(repo.fullName);
+                      }}
+                      disabled={importingRepo === repo.fullName}
+                      className="h-9 px-3 flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-bold rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs transition-all active:scale-[0.98] disabled:opacity-50"
+                    >
+                      {importingRepo === repo.fullName ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          <span>Importing...</span>
+                        </>
+                      ) : (
+                        <>
+                          <UploadCloud className="w-3.5 h-3.5" />
+                          <span>Import to Lab</span>
+                        </>
+                      )}
+                    </button>
+                  </CustomTooltip>
+                ) : (
+                  <CustomTooltip content="Edit project" side="top">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCardClick();
+                      }}
+                      className="h-9 px-3 flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-bold rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs transition-all active:scale-[0.98]"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                      <span>Edit</span>
+                    </button>
+                  </CustomTooltip>
+                )}
 
                 {/* Actions Menu */}
                 <div onClick={(e) => e.stopPropagation()}>
@@ -362,6 +412,7 @@ export function RepoGrid({
                     isAuditing={isAuditing}
                     isDeployingVercel={isDeployingVercel}
                     isCiCapturing={isCiCapturing}
+                    isImporting={importingRepo === repo.fullName}
                     dropUp={true}
                     onAnalyze={() => onAnalyze(repo.fullName)}
                     onAudit={() => onAudit(repo.fullName)}
@@ -369,6 +420,7 @@ export function RepoGrid({
                       onDeployVercelModal(repo.fullName, auditItem?.audit?.envVariables)
                     }
                     onCaptureAssets={() => onDeployAssetRunner(repo.fullName)}
+                    onImportToLab={onImportToLab ? () => onImportToLab(repo.fullName) : undefined}
                   />
                 </div>
               </div>

@@ -5,5 +5,5 @@ import { routing } from "./i18n/routing";
 export default createMiddleware(routing);
 
 export const config = {
-  matcher: ["/", "/(fa|en)/:path*", "/admin", "/admin/:path*"],
+  matcher: ["/((?!api|admin|projects|_next|_vercel|.*\\..*).*)"],
 };

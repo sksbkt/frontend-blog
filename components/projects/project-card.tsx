@@ -1,14 +1,15 @@
 "use client";
 
 import { ArrowRight } from "lucide-react";
-import Image from "next/image";
+import ProgressiveImage from "@/components/ui/ProgressiveImage";
 import { useLocale, useTranslations } from "next-intl";
 
-import { Link } from "@/i18n/navigation";
+import Link from "next/link";
 import type { Project } from "@/types/project";
 import { TechBadgeGroup } from "@/components/ui/tech-badge-group";
 import { LanguageBar } from "@/components/ui/language-bar";
 import { CustomTooltip } from "@/components/ui/custom-tooltip";
+import { ProjectAuditBadge } from "@/components/projects/project-audit-badge";
 
 type ProjectCardProps = {
   project: Project;
@@ -34,8 +35,9 @@ export default function ProjectCard({
         className="relative block h-56 w-full overflow-hidden shrink-0"
       >
         <div className="absolute inset-0 overflow-hidden">
-          <Image
+          <ProgressiveImage
             src={project.image}
+            lowResSrc={project.lowResImage || project.lowResCoverUrl}
             alt={project.title[language]}
             fill
             sizes="(max-width: 768px) 100vw, 50vw"
@@ -117,6 +119,8 @@ export default function ProjectCard({
             </CustomTooltip>
           )}
         </div>
+
+        <ProjectAuditBadge project={project} isAdmin={false} locale={locale} />
       </div>
     </article>
   );

@@ -59,7 +59,7 @@ export function ProjectEditModal({
     setIsSaving(true);
     try {
       await onSave(form);
-      showToast("Project updated successfully in Sanity CMS!", "success");
+      showToast("Project updated successfully in database!", "success");
       onClose();
     } catch (err: unknown) {
       showToast(

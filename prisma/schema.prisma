@@ -21,7 +21,11 @@ model Project {
 
   // Metadata, URLs & Layout
   coverImageUrl   String?
+  lowResCoverUrl  String?     // Tiny WebP thumbnail (24-32px blurred)
+  assetSource     String?     // "USER_UPLOAD" | "GITHUB_OG" | "GITHUB_ACTION_CAPTURE"
+  ogCachedAt      DateTime?   // Timestamp for 14-day TTL tracking
   githubUrl       String?
+  repoUrl         String?
   liveUrl         String?
   order           Int      @default(0)
   isPublished     Boolean  @default(false)
@@ -34,6 +38,11 @@ model Project {
 
   // SCA Deep Scan Dossier (complete repo topology, manifests, commit friction, summaries)
   aiContextDigest Json?
+
+  // Interactive Project Audit Score & Breakdown
+  auditScore      Int?
+  auditBreakdown  Json?
+  auditedAt       DateTime?
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -65,17 +74,25 @@ model ApiCache {
   updatedAt DateTime @updatedAt
 }
 
-// 14-day TTL CDN Asset Cache (e.g. GitHub OpenGraph images stored in Supabase Storage)
+// 14-day TTL CDN Asset Cache & Dual-Tier Media Registry
 model AssetCache {
   id          String   @id @default(cuid())
-  key         String   @unique // e.g. "github-og:owner/repo"
-  storageUrl  String   // Permanent Supabase Storage public CDN URL
-  contentType String   @default("image/png")
-  expiresAt   DateTime // Date.now() + 14 days
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  projectSlug String
+  assetType   String   // "GITHUB_OG" | "SCREENSHOT" | "GIF"
+  highResUrl  String
+  lowResUrl   String?
+  cachedAt    DateTime @default(now())
+  expiresAt   DateTime // cachedAt + 14 days
 
-  @@index([key])
+  // Optional legacy fields for backward compatibility
+  key         String?  @unique
+  storageUrl  String?
+  contentType String?  @default("image/png")
+  createdAt   DateTime? @default(now())
+  updatedAt   DateTime? @updatedAt
+
+  @@unique([projectSlug, assetType])
+  @@index([projectSlug])
   @@index([expiresAt])
 }
 

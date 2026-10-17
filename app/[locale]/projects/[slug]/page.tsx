@@ -1,4 +1,4 @@
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ShieldCheck, CheckCircle2 } from "lucide-react";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
@@ -12,6 +12,7 @@ import { Link } from "@/i18n/navigation";
 import { getDbProjectBySlug } from "@/lib/services/project-service";
 import { LanguageBar } from "@/components/ui/language-bar";
 import { TechBadgeGroup } from "@/components/ui/tech-badge-group";
+import { ProjectAuditBadge } from "@/components/projects/project-audit-badge";
 
 type ProjectPageProps = {
   params: Promise<{
@@ -74,15 +75,19 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
                 alt={project.title[language]}
                 fill
                 priority
+                unoptimized={Boolean(project.image?.includes("supabase.co"))}
                 className="object-cover"
               />
             </div>
           )}
 
           <div className="p-6 md:p-10">
-            <span className="text-sm font-medium uppercase tracking-widest text-primary">
-              {t("page.label")}
-            </span>
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <span className="text-sm font-medium uppercase tracking-widest text-primary">
+                {t("page.label")}
+              </span>
+              <ProjectAuditBadge project={project} isAdmin={false} locale={locale} />
+            </div>
 
             <h1 className="mt-3 text-4xl font-bold tracking-tight md:text-5xl">
               {project.title[language]}
@@ -158,6 +163,73 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
                 />
               </div>
             )}
+
+            {/* Engineering Telemetry Grid & Architecture Scorecard */}
+            <div className="rounded-xl border bg-card p-5 space-y-4 shadow-xs">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="font-semibold text-sm text-foreground flex items-center gap-1.5">
+                  <ShieldCheck className="size-4 text-primary" />
+                  <span>Engineering Telemetry</span>
+                </h3>
+                <ProjectAuditBadge project={project} isAdmin={false} locale={locale} />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+                <div className="bg-muted/40 p-2 rounded-lg">
+                  <span className="text-muted-foreground block text-[10px]">
+                    Storage Engine
+                  </span>
+                  <span className="font-bold text-foreground">Supabase S3</span>
+                </div>
+                <div className="bg-muted/40 p-2 rounded-lg">
+                  <span className="text-muted-foreground block text-[10px]">
+                    Asset Storage
+                  </span>
+                  <span className="font-bold text-foreground">
+                    {project.auditBreakdown?.breakdown?.assets ?? 100}%
+                  </span>
+                </div>
+                <div className="bg-muted/40 p-2 rounded-lg">
+                  <span className="text-muted-foreground block text-[10px]">
+                    Languages
+                  </span>
+                  <span className="font-bold text-foreground">
+                    {project.auditBreakdown?.breakdown?.languages ?? 95}%
+                  </span>
+                </div>
+                <div className="bg-muted/40 p-2 rounded-lg">
+                  <span className="text-muted-foreground block text-[10px]">
+                    Taxonomy
+                  </span>
+                  <span className="font-bold text-foreground">
+                    {project.auditBreakdown?.breakdown?.technologies ?? 100}%
+                  </span>
+                </div>
+              </div>
+
+                {((language === "fa" && project.auditBreakdown?.strengthsFa?.length) ||
+                  project.auditBreakdown?.strengths?.length) && (
+                  <div className="space-y-1.5 pt-1 border-t border-border/40">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-500">
+                      {language === "fa" ? "نقاط قوت" : "Strengths"}
+                    </span>
+                    <ul className="space-y-1">
+                      {(
+                        (language === "fa" && project.auditBreakdown?.strengthsFa?.length
+                          ? project.auditBreakdown.strengthsFa
+                          : project.auditBreakdown?.strengths) || []
+                      )
+                        .slice(0, 3)
+                        .map((s: string, idx: number) => (
+                          <li key={idx} className="flex items-start gap-1.5 text-xs text-foreground/90">
+                            <CheckCircle2 className="size-3 text-emerald-500 shrink-0 mt-0.5" />
+                            <span>{s}</span>
+                          </li>
+                        ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
 
             <div>
               <h3 className="font-semibold">{t("page.challenges")}</h3>

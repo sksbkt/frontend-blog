@@ -5,9 +5,11 @@ import { syncRepoAssetsToProject } from "@/lib/services/sync-assets";
 export async function POST(request: Request) {
   const session = await getSession();
 
-  if (!session || !session.accessToken) {
+  const token = session?.accessToken || process.env.GITHUB_TOKEN || process.env.GITHUB_PERSONAL_ACCESS_TOKEN;
+
+  if (!session || !token) {
     return NextResponse.json(
-      { success: false, message: "Unauthorized: Active admin GitHub session required." },
+      { success: false, message: "Unauthorized: Active admin GitHub session or token required." },
       { status: 401 }
     );
   }
@@ -29,7 +31,7 @@ export async function POST(request: Request) {
       owner,
       repo,
       branch: typeof branch === "string" ? branch.trim() : "main",
-      token: session.accessToken,
+      token,
       projectId: typeof projectId === "string" ? projectId.trim() : undefined,
     });
 

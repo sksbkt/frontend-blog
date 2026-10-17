@@ -169,7 +169,7 @@ async function main() {
         (p.coverImageUrl.includes("cdn.sanity.io") || p.coverImageUrl.includes("githubassets.com"))
     );
     const invalidCaches = activeAssetCaches.filter((c) =>
-      c.storageUrl.includes("githubassets.com")
+      c.storageUrl?.includes("githubassets.com")
     );
 
     if (invalidProjects.length > 0 || invalidCaches.length > 0) {

@@ -54,7 +54,7 @@ async function main() {
 
       if (cacheRecord) {
         console.log(
-          `  -> [AssetCache Verified] ID: ${cacheRecord.id} | Expires: ${cacheRecord.expiresAt.toISOString()}`
+          `  -> [AssetCache Verified] ID: ${cacheRecord.id} | Expires: ${cacheRecord.expiresAt?.toISOString() ?? "permanent"}`
         );
       } else {
         console.warn(`  -> [AssetCache Warning] Record for ${cacheKey} was not found in DB.`);
@@ -90,7 +90,7 @@ async function main() {
 
     console.log(`\nLatest AssetCache Records in Supabase PostgreSQL:`);
     for (const rec of allCached) {
-      console.log(`  - [${rec.key}] -> ${rec.storageUrl.slice(0, 70)}... (TTL: ${rec.expiresAt.toISOString()})`);
+      console.log(`  - [${rec.key}] -> ${(rec.storageUrl || "").slice(0, 70)}... (TTL: ${rec.expiresAt?.toISOString() ?? "permanent"})`);
     }
 
     console.log("\n✅ All flagship OpenGraph assets successfully cached and verified under RootZero Systems Lab™ standards.");

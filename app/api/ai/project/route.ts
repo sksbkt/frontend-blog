@@ -1183,7 +1183,7 @@ export async function POST(request: Request) {
 
       draft: {
         id: draft._id,
-        message: "Sanity draft created successfully.",
+        message: "Database draft created successfully.",
       },
     });
   } catch (error) {

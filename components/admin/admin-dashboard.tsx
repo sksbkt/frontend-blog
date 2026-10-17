@@ -61,9 +61,9 @@ export default function AdminDashboard({
   const [reposLoading, setReposLoading] = useState(false);
   const [repoSearch, setRepoSearch] = useState("");
   const [selectedRepoId, setSelectedRepoId] = useState<number | null>(null);
-  const [filterMode, setFilterMode] = useState<"all" | "synced" | "missingReadme" | "hasLiveDemo">("all");
+  const [filterMode, setFilterMode] = useState<"all" | "synced" | "unimported" | "missingReadme" | "hasLiveDemo">("all");
 
-  // Projects state (Drafts & Published from Sanity)
+  // Projects state (Drafts & Published from Database)
   const [drafts, setDrafts] = useState<SanityProject[]>([]);
   const [published, setPublished] = useState<SanityProject[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(false);
@@ -72,6 +72,7 @@ export default function AdminDashboard({
   const [repoAudits, setRepoAudits] = useState<Record<string, RepoAuditItem>>({});
   const [auditingRepo, setAuditingRepo] = useState<string | null>(null);
   const [analyzingRepo, setAnalyzingRepo] = useState<string | null>(null);
+  const [importingRepo, setImportingRepo] = useState<string | null>(null);
   const [deployingAssetRunner, setDeployingAssetRunner] = useState<string | null>(null);
   const [isSyncingAssets, setIsSyncingAssets] = useState(false);
 
@@ -229,11 +230,40 @@ export default function AdminDashboard({
         )
       );
 
-      showToast(`Draft created in Sanity CMS for ${fullName}!`, "success");
+      showToast(`Draft created in Lab for ${fullName}!`, "success");
     } catch (err: unknown) {
       showToast(err instanceof Error ? err.message : "Error generating draft", "error");
     } finally {
       setAnalyzingRepo(null);
+    }
+  };
+
+  // Explicitly import repository into PostgreSQL via /api/admin/projects/import
+  const handleImportToLab = async (fullName: string) => {
+    setImportingRepo(fullName);
+    try {
+      const res = await fetch("/api/admin/projects/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fullName }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || data.error || "Failed to import repository.");
+
+      await fetchProjects();
+      setRepos((prev) =>
+        prev.map((r) =>
+          r.fullName.toLowerCase() === fullName.toLowerCase()
+            ? { ...r, importStatus: "draft" }
+            : r
+        )
+      );
+
+      showToast(`Imported ${fullName} into Lab with sovereign Supabase cover!`, "success");
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : "Error importing repository", "error");
+    } finally {
+      setImportingRepo(null);
     }
   };
 
@@ -262,7 +292,7 @@ export default function AdminDashboard({
     }
   };
 
-  // Sync Assets from GitHub to Sanity
+  // Sync Assets from GitHub to Supabase Storage & Database
   const handleSyncAssets = async (fullName: string, projectId?: string) => {
     setIsSyncingAssets(true);
     try {
@@ -284,7 +314,7 @@ export default function AdminDashboard({
 
       await fetchProjects();
       showToast(
-        `Synced ${data.syncedAssets?.length || 0} visual assets to Sanity CMS!`,
+        `Synced ${data.syncedAssets?.length || 0} visual assets to Supabase Storage!`,
         "success"
       );
     } catch (err: unknown) {
@@ -326,6 +356,8 @@ export default function AdminDashboard({
 
     if (filterMode === "synced") {
       result = result.filter((r) => r.importStatus === "published" || r.importStatus === "draft");
+    } else if (filterMode === "unimported") {
+      result = result.filter((r) => r.importStatus === "none");
     } else if (filterMode === "missingReadme") {
       result = result.filter((r) => {
         const audit = repoAudits[r.fullName.toLowerCase()];
@@ -349,8 +381,9 @@ export default function AdminDashboard({
     if (!selectedRepo) return undefined;
     return drafts.find(
       (d) =>
-        d.github &&
-        d.github.toLowerCase().includes(selectedRepo.fullName.toLowerCase())
+        (d.github && d.github.toLowerCase().includes(selectedRepo.fullName.toLowerCase())) ||
+        (d.github && d.github.toLowerCase().includes(selectedRepo.name.toLowerCase())) ||
+        d.slug?.current?.toLowerCase() === selectedRepo.name.toLowerCase()
     );
   }, [drafts, selectedRepo]);
 
@@ -358,8 +391,9 @@ export default function AdminDashboard({
     if (!selectedRepo) return undefined;
     return published.find(
       (p) =>
-        p.github &&
-        p.github.toLowerCase().includes(selectedRepo.fullName.toLowerCase())
+        (p.github && p.github.toLowerCase().includes(selectedRepo.fullName.toLowerCase())) ||
+        (p.github && p.github.toLowerCase().includes(selectedRepo.name.toLowerCase())) ||
+        p.slug?.current?.toLowerCase() === selectedRepo.name.toLowerCase()
     );
   }, [published, selectedRepo]);
 
@@ -603,6 +637,18 @@ export default function AdminDashboard({
 
                 <button
                   type="button"
+                  onClick={() => setFilterMode("unimported")}
+                  className={`px-2.5 py-1 text-xs font-semibold rounded-lg whitespace-nowrap transition-colors min-h-[32px] ${
+                    filterMode === "unimported"
+                      ? "bg-primary text-primary-foreground shadow-xs"
+                      : "bg-card text-muted-foreground hover:bg-muted hover:text-foreground border border-border"
+                  }`}
+                >
+                  Available on GitHub
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => setFilterMode("missingReadme")}
                   className={`px-2.5 py-1 text-xs font-semibold rounded-lg whitespace-nowrap transition-colors min-h-[32px] ${
                     filterMode === "missingReadme"
@@ -655,10 +701,16 @@ export default function AdminDashboard({
                   const audit = repoAudits[repo.fullName.toLowerCase()];
                   const isSelected = selectedRepoId === repo.id;
                   const matchPub = published.find(
-                    (p) => p.github && p.github.toLowerCase().includes(repo.fullName.toLowerCase())
+                    (p) =>
+                      (p.github && p.github.toLowerCase().includes(repo.fullName.toLowerCase())) ||
+                      (p.github && p.github.toLowerCase().includes(repo.name.toLowerCase())) ||
+                      p.slug?.current?.toLowerCase() === repo.name.toLowerCase()
                   );
                   const matchDraft = drafts.find(
-                    (d) => d.github && d.github.toLowerCase().includes(repo.fullName.toLowerCase())
+                    (d) =>
+                      (d.github && d.github.toLowerCase().includes(repo.fullName.toLowerCase())) ||
+                      (d.github && d.github.toLowerCase().includes(repo.name.toLowerCase())) ||
+                      d.slug?.current?.toLowerCase() === repo.name.toLowerCase()
                   );
 
                   return (
@@ -703,6 +755,7 @@ export default function AdminDashboard({
               isDeployingVercel={false}
               isCiCapturing={deployingAssetRunner === selectedRepo?.fullName}
               isSyncingAssets={isSyncingAssets}
+              isImporting={importingRepo === selectedRepo?.fullName}
               onAnalyze={handleAnalyzeRepo}
               onAudit={handleRunAudit}
               onDeployVercelModal={(fullName, envVars) =>
@@ -716,6 +769,7 @@ export default function AdminDashboard({
               onSyncAssets={handleSyncAssets}
               onOpenPushModal={(cfg) => setPushingReadmeConfig(cfg)}
               onEditProject={(proj) => setEditingProject(proj)}
+              onImportToLab={handleImportToLab}
             />
           </div>
         </div>
@@ -777,6 +831,18 @@ export default function AdminDashboard({
 
               <button
                 type="button"
+                onClick={() => setFilterMode("unimported")}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg whitespace-nowrap transition-colors min-h-[34px] ${
+                  filterMode === "unimported"
+                    ? "bg-primary text-primary-foreground shadow-xs"
+                    : "bg-card text-muted-foreground hover:bg-muted hover:text-foreground border border-border"
+                }`}
+              >
+                Available on GitHub
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setFilterMode("missingReadme")}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-lg whitespace-nowrap transition-colors min-h-[34px] ${
                   filterMode === "missingReadme"
@@ -830,6 +896,7 @@ export default function AdminDashboard({
                 auditingRepo={auditingRepo}
                 deployingAssetRunner={deployingAssetRunner}
                 isDeployingVercel={false}
+                importingRepo={importingRepo}
                 onAnalyze={handleAnalyzeRepo}
                 onAudit={handleRunAudit}
                 onDeployVercelModal={(fullName, envVars) =>
@@ -841,6 +908,7 @@ export default function AdminDashboard({
                 }
                 onDeployAssetRunner={handleDeployAssetRunner}
                 onEditProject={(proj) => setEditingProject(proj)}
+                onImportToLab={handleImportToLab}
               />
             )}
           </div>

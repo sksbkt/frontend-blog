@@ -49,6 +49,7 @@ export function DeveloperHud() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "H" || e.key === "h")) {
         e.preventDefault();
+        setIsMinimized(false);
         toggleHud();
       }
     };
@@ -98,20 +99,20 @@ export function DeveloperHud() {
     }
   };
 
-  // If telemetry is completely disabled and HUD is closed, render nothing
-  if (!isTelemetryEnabled && !isHudOpen) {
+  // If HUD is closed, render nothing
+  if (!isHudOpen) {
     return null;
   }
 
-  // Floating Pill when HUD is closed but telemetry is enabled
-  if (!isHudOpen) {
+  // When HUD is minimized, render the compact floating pill
+  if (isMinimized) {
     return (
-      <div className="fixed bottom-4 end-4 z-50">
+      <div className="fixed bottom-4 end-4 z-50 flex items-center gap-1.5 group/pill">
         <button
           type="button"
-          onClick={() => setIsHudOpen(true)}
-          className="group flex items-center gap-2 px-3 py-1.5 rounded-full bg-neutral-900/90 hover:bg-neutral-900 text-neutral-200 border border-neutral-700/80 shadow-2xl backdrop-blur-md transition-all text-xs font-mono active:scale-95"
-          title="Open Developer HUD (Ctrl+Shift+H)"
+          onClick={() => setIsMinimized(false)}
+          className="group flex items-center gap-2 px-3 py-1.5 rounded-full bg-neutral-900/90 hover:bg-neutral-900 text-neutral-200 border border-neutral-700/80 shadow-2xl backdrop-blur-md transition-all text-xs font-mono active:scale-95 cursor-pointer"
+          title="Expand Developer HUD"
         >
           <span
             className={`w-2 h-2 rounded-full ${
@@ -129,9 +130,18 @@ export function DeveloperHud() {
           <span className="text-[10px] text-neutral-400 hidden sm:inline">
             ({stats.total} evts)
           </span>
-          <span className="text-[9px] text-neutral-500 font-sans border border-neutral-700 px-1 rounded">
-            Ctrl+Shift+H
-          </span>
+          <Maximize2 className="w-3 h-3 text-neutral-400 group-hover:text-neutral-200" />
+        </button>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsHudOpen(false);
+          }}
+          className="p-1.5 rounded-full bg-neutral-900/90 hover:bg-neutral-800 text-neutral-400 hover:text-rose-400 border border-neutral-700/80 shadow-xl transition-all cursor-pointer opacity-70 group-hover/pill:opacity-100"
+          title="Close HUD"
+        >
+          <X className="w-3.5 h-3.5" />
         </button>
       </div>
     );
@@ -139,11 +149,7 @@ export function DeveloperHud() {
 
   return (
     <div
-      className={`fixed bottom-4 end-4 z-50 flex flex-col rounded-2xl bg-neutral-950/95 border border-neutral-800 text-neutral-100 shadow-2xl backdrop-blur-xl font-mono transition-all duration-200 overflow-hidden ${
-        isMinimized
-          ? "w-80 sm:w-96 h-14"
-          : "w-[94vw] sm:w-[540px] md:w-[600px] h-[520px] max-h-[85vh]"
-      }`}
+      className="fixed bottom-4 end-4 z-50 flex flex-col rounded-2xl bg-neutral-950/95 border border-neutral-800 text-neutral-100 shadow-2xl backdrop-blur-xl font-mono transition-all duration-200 overflow-hidden w-[94vw] sm:w-[540px] md:w-[600px] h-[520px] max-h-[85vh]"
     >
       {/* HUD Header */}
       <div className="px-4 py-3 bg-neutral-900/80 border-b border-neutral-800/80 flex items-center justify-between shrink-0 select-none">
@@ -156,13 +162,15 @@ export function DeveloperHud() {
               <span className="text-xs font-bold tracking-wider text-neutral-100">
                 TELEMETRY HUD
               </span>
-              <span className="text-[9px] px-1.5 py-0.5 rounded uppercase font-semibold border flex items-center gap-1 leading-none ${
-                connectionStatus === 'connected'
-                  ? 'bg-emerald-950/80 text-emerald-400 border-emerald-700/60'
-                  : connectionStatus === 'reconnecting'
-                  ? 'bg-amber-950/80 text-amber-400 border-amber-700/60 animate-pulse'
-                  : 'bg-neutral-800 text-neutral-400 border-neutral-700'
-              }">
+              <span
+                className={`text-[9px] px-1.5 py-0.5 rounded uppercase font-semibold border flex items-center gap-1 leading-none ${
+                  connectionStatus === "connected"
+                    ? "bg-emerald-950/80 text-emerald-400 border-emerald-700/60"
+                    : connectionStatus === "reconnecting"
+                    ? "bg-amber-950/80 text-amber-400 border-amber-700/60 animate-pulse"
+                    : "bg-neutral-800 text-neutral-400 border-neutral-700"
+                }`}
+              >
                 <span
                   className={`w-1.5 h-1.5 rounded-full ${
                     connectionStatus === "connected"
@@ -185,16 +193,22 @@ export function DeveloperHud() {
         <div className="flex items-center gap-1.5 text-neutral-400">
           <button
             type="button"
-            onClick={() => setIsMinimized(!isMinimized)}
-            className="p-1.5 rounded-lg hover:bg-neutral-800 hover:text-neutral-200 transition-colors"
-            title={isMinimized ? "Expand" : "Minimize"}
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsMinimized(true);
+            }}
+            className="p-1.5 rounded-lg hover:bg-neutral-800 hover:text-neutral-200 transition-colors cursor-pointer"
+            title="Minimize HUD"
           >
-            {isMinimized ? <Maximize2 className="w-3.5 h-3.5" /> : <Minimize2 className="w-3.5 h-3.5" />}
+            <Minimize2 className="w-3.5 h-3.5" />
           </button>
           <button
             type="button"
-            onClick={() => setIsHudOpen(false)}
-            className="p-1.5 rounded-lg hover:bg-neutral-800 hover:text-rose-400 transition-colors"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsHudOpen(false);
+            }}
+            className="p-1.5 rounded-lg hover:bg-neutral-800 hover:text-rose-400 transition-colors cursor-pointer"
             title="Close HUD"
           >
             <X className="w-4 h-4" />

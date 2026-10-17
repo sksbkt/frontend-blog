@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
@@ -25,6 +25,9 @@ import {
   RotateCcw,
   Cpu,
   Radar,
+  Camera,
+  DownloadCloud,
+  Film,
 } from "lucide-react";
 import { FaGithub as Github } from "react-icons/fa";
 import { Breadcrumbs } from "./breadcrumbs";
@@ -32,6 +35,7 @@ import { ProjectThumbnail } from "./project-thumbnail";
 import { BilingualFieldRow } from "./bilingual-field-row";
 import { LanguageBar } from "@/components/ui/language-bar";
 import { CustomTooltip } from "@/components/ui/custom-tooltip";
+import { ProjectAuditBadge } from "@/components/projects/project-audit-badge";
 import type { SanityProject, GalleryItem } from "./types";
 import type { ScanStreamEvent } from "@/types/api";
 import { DeveloperTelemetryToggle } from "./developer-telemetry-toggle";
@@ -74,6 +78,27 @@ export function ProjectFullPageEditor({
     type: "success" | "error" | "info";
   } | null>(null);
 
+  // Media Gallery Sovereign Assets State
+  type ProjectMediaData = {
+    githubOg: {
+      exists: boolean;
+      url: string | null;
+      lowResUrl: string | null;
+    };
+    captures: Array<{
+      name: string;
+      url: string;
+      lowResUrl?: string | null;
+      type: "SCREENSHOT" | "GIF";
+    }>;
+  };
+
+  const [mediaData, setMediaData] = useState<ProjectMediaData | null>(null);
+  const [isLoadingMedia, setIsLoadingMedia] = useState(false);
+  const [isFetchingOg, setIsFetchingOg] = useState(false);
+  const [isTriggeringCapture, setIsTriggeringCapture] = useState(false);
+  const [isSyncingCaptures, setIsSyncingCaptures] = useState(false);
+
   // Extract GitHub repo fullName (owner/repo) if project has a github URL
   const githubRepoFullName = React.useMemo(() => {
     if (!project.github) return null;
@@ -82,15 +107,129 @@ export function ProjectFullPageEditor({
     return parts.length >= 2 ? `${parts[0]}/${parts[1]}` : null;
   }, [project.github]);
 
+  const loadMediaData = useCallback(async () => {
+    try {
+      setIsLoadingMedia(true);
+      const res = await fetch(`/api/admin/projects/${encodeURIComponent(project._id)}/media`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setMediaData({
+            githubOg: data.githubOg,
+            captures: data.captures || [],
+          });
+        }
+      }
+    } catch (err) {
+      console.warn("[MediaGallery] Error loading media data:", err);
+    } finally {
+      setIsLoadingMedia(false);
+    }
+  }, [project._id]);
+
+  useEffect(() => {
+    if (activeTab === "media") {
+      loadMediaData();
+    }
+  }, [activeTab, loadMediaData]);
+
+  // Check if an asset is the currently selected cover
+  const isCurrentCover = useCallback(
+    (assetUrl?: string | null, assetId?: string | null) => {
+      if (!assetUrl && !assetId) return false;
+      const currentUrl = project.coverImage?.asset?.url || project.image?.asset?.url || "";
+      const currentId = project.coverImage?.asset?._id || project.coverImage?.asset?._ref || "";
+
+      if (assetUrl && currentUrl && assetUrl === currentUrl) return true;
+      if (assetId && currentId && assetId === currentId) return true;
+      if (assetUrl && currentUrl) {
+        const cleanA = assetUrl.split("?")[0];
+        const cleanC = currentUrl.split("?")[0];
+        if (cleanA === cleanC) return true;
+        if (cleanA.replace(/-low\.webp$/, "-high.webp") === cleanC.replace(/-low\.webp$/, "-high.webp")) return true;
+      }
+      return false;
+    },
+    [project.coverImage, project.image]
+  );
+
+  // Fetch or Re-fetch GitHub OpenGraph social card
+  const handleFetchOg = async () => {
+    setIsFetchingOg(true);
+    try {
+      const res = await fetch(`/api/admin/projects/${encodeURIComponent(project._id)}/fetch-og`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to fetch GitHub OpenGraph image.");
+
+      showToast("GitHub OpenGraph social card successfully fetched and processed!", "success");
+      await loadMediaData();
+      router.refresh();
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : "Error fetching GitHub OG.", "error");
+    } finally {
+      setIsFetchingOg(false);
+    }
+  };
+
+  // Trigger automated visual capture on GitHub Actions
+  const handleTriggerCapture = async () => {
+    setIsTriggeringCapture(true);
+    try {
+      const res = await fetch(`/api/admin/projects/${encodeURIComponent(project._id)}/capture`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to trigger visual capture action.");
+
+      showToast(data.message || "Automated Playwright capture action dispatched on GitHub!", "success");
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : "Error triggering capture.", "error");
+    } finally {
+      setIsTriggeringCapture(false);
+    }
+  };
+
+  // Sync captures from repo assets/ folder into Supabase Storage
+  const handleSyncCaptures = async () => {
+    if (!githubRepoFullName) {
+      showToast("A valid GitHub repository URL is required to sync captures.", "error");
+      return;
+    }
+    setIsSyncingCaptures(true);
+    try {
+      const res = await fetch("/api/admin/projects/sync-assets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullName: githubRepoFullName,
+          projectId: project._id,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to sync visual captures.");
+
+      showToast(data.message || "Visual assets successfully synced into Supabase Storage!", "success");
+      await loadMediaData();
+      router.refresh();
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : "Error syncing captures.", "error");
+    } finally {
+      setIsSyncingCaptures(false);
+    }
+  };
+
   const githubOgUrl = githubRepoFullName
     ? `https://opengraph.githubassets.com/1/${githubRepoFullName}`
     : null;
 
   const isOgCover = Boolean(
-    githubRepoFullName &&
+    project.coverImage?.asset?.url?.includes("/projects/github-og/") ||
+    (githubRepoFullName &&
       (project.coverImage?.asset?.url?.includes("opengraph.githubassets.com") ||
         project.coverImage?.alt?.toLowerCase().includes("open graph") ||
-        (project.coverImage?.alt?.toLowerCase().includes("github") && project.coverImage?.alt?.toLowerCase().includes("card")))
+        (project.coverImage?.alt?.toLowerCase().includes("github") && project.coverImage?.alt?.toLowerCase().includes("card"))))
   );
 
   const hasGeneratedContent = Boolean(
@@ -480,7 +619,7 @@ export function ProjectFullPageEditor({
     });
   };
 
-  // Save changes to Sanity via PUT /api/admin/projects
+  // Save changes to database via PUT /api/admin/projects
   const handleSave = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setIsSaving(true);
@@ -497,7 +636,7 @@ export function ProjectFullPageEditor({
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || data.error || "Failed to save project.");
 
-      showToast("All project changes saved to Sanity CMS!", "success");
+      showToast("All project changes saved to database!", "success");
       router.refresh();
     } catch (err: unknown) {
       showToast(err instanceof Error ? err.message : "Error saving project.", "error");
@@ -539,7 +678,12 @@ export function ProjectFullPageEditor({
   };
 
   // Set Cover Image Mutation
-  const handleSetCover = async (assetId: string, imageUrl?: string, altText?: string) => {
+  const handleSetCover = async (
+    assetId: string,
+    imageUrl?: string,
+    altText?: string,
+    lowResUrl?: string
+  ) => {
     setIsSettingCover(assetId || imageUrl || "loading");
     try {
       const res = await fetch("/api/admin/projects/set-cover", {
@@ -549,6 +693,7 @@ export function ProjectFullPageEditor({
           projectId: project._id,
           imageAssetId: assetId,
           imageUrl,
+          lowResUrl,
           alt: altText || project.title?.en || "Cover Image",
         }),
       });
@@ -558,6 +703,7 @@ export function ProjectFullPageEditor({
 
       // Synchronize local state immediately
       const finalId = data.assetId || assetId;
+      const finalUrl = data.coverImageUrl || imageUrl || project.coverImage?.asset?.url;
       setProject((prev) => ({
         ...prev,
         gallery: data.project?.gallery || prev.gallery,
@@ -567,12 +713,22 @@ export function ProjectFullPageEditor({
           asset: {
             _id: finalId,
             _ref: finalId,
-            url: imageUrl || prev.coverImage?.asset?.url,
+            url: finalUrl,
+          },
+        },
+        image: {
+          _type: "image",
+          alt: altText || prev.title?.en || "Cover Image",
+          asset: {
+            _id: finalId,
+            _ref: finalId,
+            url: finalUrl,
           },
         },
       }));
 
-      showToast("Cover image successfully updated in Sanity CMS!", "success");
+      await loadMediaData();
+      showToast("Cover image successfully updated in database!", "success");
       router.refresh();
     } catch (err: unknown) {
       showToast(err instanceof Error ? err.message : "Error setting cover image.", "error");
@@ -615,7 +771,7 @@ export function ProjectFullPageEditor({
       const updatedGallery = [...(project.gallery || []), newGalleryItem];
       setProject({ ...project, gallery: updatedGallery });
 
-      // Automatically patch Sanity document
+      // Automatically patch database document
       await fetch("/api/admin/projects", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -690,7 +846,16 @@ export function ProjectFullPageEditor({
           items={[
             { label: "Admin", href: `/${locale}/admin` },
             { label: "Projects", href: `/${locale}/admin?view=grid` },
-            { label: project.title?.en || project.slug?.current || "Project Editor", current: true },
+            {
+              label:
+                (locale === "fa"
+                  ? project.title?.fa?.trim() || project.title?.en?.trim()
+                  : project.title?.en?.trim() || project.title?.fa?.trim()) ||
+                (githubRepoFullName ? githubRepoFullName.split("/")[1] : null) ||
+                project.slug?.current ||
+                "Project Editor",
+              current: true,
+            },
           ]}
         />
 
@@ -712,10 +877,23 @@ export function ProjectFullPageEditor({
         <div className="space-y-1.5 min-w-0">
           <div className="flex items-center gap-3 flex-wrap">
             <h1
-              dir="ltr"
+              dir={locale === "fa" && project.title?.fa ? "rtl" : "ltr"}
               className="text-xl sm:text-2xl font-bold text-foreground font-sans text-left truncate"
+              title={
+                (locale === "fa"
+                  ? project.title?.fa?.trim() || project.title?.en?.trim()
+                  : project.title?.en?.trim() || project.title?.fa?.trim()) ||
+                (githubRepoFullName ? githubRepoFullName.split("/")[1] : null) ||
+                project.slug?.current ||
+                "Project Editor"
+              }
             >
-              {project.title?.en || "Untitled Project"}
+              {(locale === "fa"
+                ? project.title?.fa?.trim() || project.title?.en?.trim()
+                : project.title?.en?.trim() || project.title?.fa?.trim()) ||
+                (githubRepoFullName ? githubRepoFullName.split("/")[1] : null) ||
+                project.slug?.current ||
+                "Untitled Project"}
             </h1>
 
             <span
@@ -727,6 +905,32 @@ export function ProjectFullPageEditor({
             >
               {project.isDraft ? "Draft for Review" : "Published Live"}
             </span>
+
+            <ProjectAuditBadge
+              project={{
+                id: project._id,
+                slug: project.slug?.current,
+                auditScore: project.auditScore,
+                auditBreakdown: project.auditBreakdown,
+                auditedAt: project.auditedAt,
+              }}
+              isAdmin={true}
+              locale={locale}
+              onAuditUpdated={(report) => {
+                setProject((prev) => ({
+                  ...prev,
+                  auditScore: report.score,
+                  auditBreakdown: report,
+                  auditedAt: report.auditedAt,
+                }));
+                showToast(
+                  locale === "fa"
+                    ? `امتیاز ممیزی پروژه با موفقیت به ${report.score} به‌روزرسانی شد.`
+                    : `Project audit score refreshed: ${report.score}/100.`,
+                  "success"
+                );
+              }}
+            />
           </div>
 
           <p dir="ltr" className="text-xs font-mono text-muted-foreground text-left">
@@ -1313,7 +1517,7 @@ export function ProjectFullPageEditor({
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="text-xs font-bold text-foreground block">
-                  Current Cover Image (Sanity Master Reference)
+                  Current Cover Image (Primary Master Reference)
                 </label>
                 <span className="text-[11px] text-muted-foreground font-mono">
                   Asset ID: {project.coverImage?.asset?._id || project.coverImage?.asset?._ref || "Inherited"}
@@ -1344,42 +1548,224 @@ export function ProjectFullPageEditor({
               </div>
             </div>
 
-            {/* Media Assets with "Set as Cover" buttons */}
-            <div className="space-y-3 pt-2 border-t border-border/80">
-              <div className="flex items-center justify-between gap-4">
+            {/* Media Assets Gallery Section */}
+            <div className="space-y-4 pt-2 border-t border-border/80">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <h3 className="text-sm font-bold text-foreground">
-                    Project Media Assets ({(project.gallery?.length || 0) + (githubRepoFullName && !isPrivateRepo ? 1 : 0)})
+                  <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-primary" />
+                    <span>Project Media Gallery</span>
                   </h3>
-                  <p className="text-xs text-muted-foreground">
-                    Select any media asset or the GitHub Open Graph card to designate it as the primary project cover.
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Unified media assets stored permanently in Supabase Storage. Set any asset as the active cover.
                   </p>
                 </div>
 
-                <label className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl border border-border bg-card text-foreground hover:bg-muted/50 transition-colors cursor-pointer shadow-xs">
-                  {isUploading ? (
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <Upload className="w-3.5 h-3.5" />
-                  )}
-                  <span>{isUploading ? "Uploading..." : "Upload Media Asset"}</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleUploadImage}
-                    className="hidden"
-                    disabled={isUploading}
-                  />
-                </label>
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Action 1: Trigger GitHub Actions Capture */}
+                  <CustomTooltip content="Dispatch automated Playwright screenshots & GIF workflow on GitHub" side="top">
+                    <button
+                      type="button"
+                      onClick={handleTriggerCapture}
+                      disabled={isTriggeringCapture || !githubRepoFullName}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl border border-border bg-card text-foreground hover:bg-muted/50 transition-colors shadow-xs disabled:opacity-50"
+                    >
+                      {isTriggeringCapture ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-500" />
+                      ) : (
+                        <Camera className="w-3.5 h-3.5 text-primary" />
+                      )}
+                      <span>{isTriggeringCapture ? "Dispatching..." : "Trigger Capture Action"}</span>
+                    </button>
+                  </CustomTooltip>
+
+                  {/* Action 2: Sync Repo Captures */}
+                  <CustomTooltip content="Download generated screenshots/GIFs from repo assets/ folder into Supabase Storage" side="top">
+                    <button
+                      type="button"
+                      onClick={handleSyncCaptures}
+                      disabled={isSyncingCaptures || !githubRepoFullName}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl border border-border bg-card text-foreground hover:bg-muted/50 transition-colors shadow-xs disabled:opacity-50"
+                    >
+                      {isSyncingCaptures ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-500" />
+                      ) : (
+                        <DownloadCloud className="w-3.5 h-3.5 text-emerald-600" />
+                      )}
+                      <span>{isSyncingCaptures ? "Syncing..." : "Sync Repo Captures"}</span>
+                    </button>
+                  </CustomTooltip>
+
+                  {/* Action 3: Upload Custom Media */}
+                  <label className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl border border-border bg-card text-foreground hover:bg-muted/50 transition-colors cursor-pointer shadow-xs">
+                    {isUploading ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Upload className="w-3.5 h-3.5" />
+                    )}
+                    <span>{isUploading ? "Uploading..." : "Upload Media Asset"}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleUploadImage}
+                      className="hidden"
+                      disabled={isUploading}
+                    />
+                  </label>
+                </div>
               </div>
 
-              {(githubRepoFullName && githubOgUrl) || (project.gallery && project.gallery.length > 0) ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {/* Option 1A: GitHub Open Graph Social Card (Public Repos) */}
-                  {githubRepoFullName && githubOgUrl && !isPrivateRepo && (
+              {/* Unified Media Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* 1. GitHub OpenGraph Asset Card */}
+                {(() => {
+                  const ogUrl =
+                    mediaData?.githubOg?.url ||
+                    (project.coverImage?.asset?.url?.includes("/projects/github-og/")
+                      ? project.coverImage.asset.url
+                      : null);
+                  const ogLowRes = mediaData?.githubOg?.lowResUrl || null;
+                  const hasOgAsset = Boolean(mediaData?.githubOg?.exists || ogUrl);
+                  const isCurrent = isCurrentCover(ogUrl);
+
+                  if (hasOgAsset && ogUrl) {
+                    return (
+                      <div
+                        key="github-og-card"
+                        className={`flex flex-col justify-between rounded-xl overflow-hidden border p-3 transition-all ${
+                          isCurrent
+                            ? "border-emerald-500 bg-emerald-50/20 dark:bg-emerald-950/20 ring-1 ring-emerald-500/30"
+                            : "border-border bg-background hover:border-border/80"
+                        }`}
+                      >
+                        <div className="space-y-2">
+                          <div className="relative aspect-video rounded-lg overflow-hidden border border-border bg-muted/40">
+                            <ProjectThumbnail
+                              sanityCoverUrl={ogUrl || undefined}
+                              repoFullName={githubRepoFullName || undefined}
+                              alt="GitHub Open Graph Social Card"
+                              aspectRatio="aspect-video"
+                              badge={
+                                <div className="flex items-center gap-1.5">
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-neutral-900/90 text-white dark:bg-neutral-100 dark:text-neutral-900 shadow-xs">
+                                    <Github className="w-2.5 h-2.5" />
+                                    <span>GitHub OG</span>
+                                  </span>
+                                  {isCurrent && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-600 text-white shadow-xs">
+                                      <Check className="w-2.5 h-2.5" />
+                                      <span>Current Cover</span>
+                                    </span>
+                                  )}
+                                </div>
+                              }
+                            />
+                          </div>
+
+                          <div className="text-xs">
+                            <div className="flex items-center gap-1.5">
+                              <Github className="w-3.5 h-3.5 text-foreground shrink-0" />
+                              <span className="font-semibold text-foreground block truncate">
+                                GitHub Open Graph Social Card
+                              </span>
+                            </div>
+                            <span dir="ltr" className="text-[10px] font-mono text-muted-foreground block text-left truncate">
+                              projects/github-og/ • Dual-tier WebP
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Card Controls */}
+                        <div className="flex items-center justify-between gap-2 pt-3 border-t border-border/60 mt-3">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleSetCover(
+                                ogUrl,
+                                ogUrl,
+                                `${project.title?.en || "Project"} - GitHub Open Graph`,
+                                ogLowRes || undefined
+                              )
+                            }
+                            disabled={isCurrent || Boolean(isSettingCover)}
+                            className={`flex-1 h-8 px-2.5 inline-flex items-center justify-center gap-1.5 text-xs font-bold rounded-lg transition-colors ${
+                              isCurrent
+                                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 cursor-default"
+                                : "bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs"
+                            }`}
+                          >
+                            {isSettingCover === ogUrl ? (
+                              <RefreshCw className="w-3 h-3 animate-spin" />
+                            ) : isCurrent ? (
+                              <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                            ) : (
+                              <Star className="w-3 h-3" />
+                            )}
+                            <span>{isCurrent ? "Current Cover" : "★ Set as Cover"}</span>
+                          </button>
+
+                          <CustomTooltip content="Re-fetch latest OG from GitHub and re-process WebP" side="top">
+                            <button
+                              type="button"
+                              onClick={handleFetchOg}
+                              disabled={isFetchingOg || !githubRepoFullName}
+                              className="h-8 px-2.5 inline-flex items-center gap-1 rounded-lg border border-border text-xs font-bold text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50"
+                            >
+                              <RefreshCw className={`w-3.5 h-3.5 ${isFetchingOg ? "animate-spin text-primary" : ""}`} />
+                              <span>{isFetchingOg ? "Fetching..." : "Re-fetch OG"}</span>
+                            </button>
+                          </CustomTooltip>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // Dashed placeholder card when GitHub OG is not yet in Supabase
+                  return (
                     <div
+                      key="github-og-placeholder"
+                      className="flex flex-col justify-between rounded-xl overflow-hidden border border-dashed border-border bg-muted/20 p-4 text-xs space-y-3"
+                    >
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 font-bold text-foreground">
+                            <Github className="w-4 h-4 shrink-0" />
+                            <span>GitHub Open Graph</span>
+                          </div>
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono text-muted-foreground bg-muted border border-border">
+                            Not Cached
+                          </span>
+                        </div>
+                        <p className="text-muted-foreground text-[11px] leading-relaxed">
+                          No sovereign GitHub OpenGraph asset cached in Supabase Storage yet.
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleFetchOg}
+                        disabled={isFetchingOg || !githubRepoFullName}
+                        className="w-full h-8 px-2.5 inline-flex items-center justify-center gap-1.5 text-xs font-bold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs transition-colors disabled:opacity-50"
+                      >
+                        {isFetchingOg ? (
+                          <RefreshCw className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <DownloadCloud className="w-3.5 h-3.5" />
+                        )}
+                        <span>{isFetchingOg ? "Processing WebP..." : "Fetch GitHub OG"}</span>
+                      </button>
+                    </div>
+                  );
+                })()}
+
+                {/* 2. Automated Action Captures (Screenshots & GIFs) */}
+                {mediaData?.captures?.map((capture, cIdx) => {
+                  const isCurrent = isCurrentCover(capture.url);
+                  return (
+                    <div
+                      key={capture.url || cIdx}
                       className={`flex flex-col justify-between rounded-xl overflow-hidden border p-3 transition-all ${
-                        isOgCover
+                        isCurrent
                           ? "border-emerald-500 bg-emerald-50/20 dark:bg-emerald-950/20 ring-1 ring-emerald-500/30"
                           : "border-border bg-background hover:border-border/80"
                       }`}
@@ -1387,35 +1773,37 @@ export function ProjectFullPageEditor({
                       <div className="space-y-2">
                         <div className="relative aspect-video rounded-lg overflow-hidden border border-border bg-muted/40">
                           <ProjectThumbnail
-                            sanityCoverUrl={githubOgUrl}
-                            repoFullName={githubRepoFullName}
-                            alt="GitHub Open Graph Social Card"
+                            sanityCoverUrl={capture.url || undefined}
+                            repoFullName={githubRepoFullName || undefined}
+                            alt={capture.name}
                             aspectRatio="aspect-video"
                             badge={
-                              isOgCover ? (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-600 text-white shadow-xs">
-                                  <Star className="w-2.5 h-2.5 fill-white" />
-                                  <span>Cover</span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-purple-600 text-white shadow-xs">
+                                  {capture.type === "GIF" ? (
+                                    <Film className="w-2.5 h-2.5" />
+                                  ) : (
+                                    <Camera className="w-2.5 h-2.5" />
+                                  )}
+                                  <span>{capture.type === "GIF" ? "Capture: GIF" : "Capture: Screenshot"}</span>
                                 </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-neutral-900/90 text-white dark:bg-neutral-100 dark:text-neutral-900 shadow-xs">
-                                  <Github className="w-2.5 h-2.5" />
-                                  <span>Open Graph</span>
-                                </span>
-                              )
+                                {isCurrent && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-600 text-white shadow-xs">
+                                    <Check className="w-2.5 h-2.5" />
+                                    <span>Current Cover</span>
+                                  </span>
+                                )}
+                              </div>
                             }
                           />
                         </div>
 
                         <div className="text-xs">
-                          <div className="flex items-center gap-1.5">
-                            <Github className="w-3.5 h-3.5 text-foreground shrink-0" />
-                            <span className="font-semibold text-foreground block truncate">
-                              GitHub Open Graph Social Card
-                            </span>
-                          </div>
+                          <span className="font-semibold text-foreground block truncate">
+                            {capture.name}
+                          </span>
                           <span dir="ltr" className="text-[10px] font-mono text-muted-foreground block text-left truncate">
-                            {githubRepoFullName} • 1200×630
+                            projects/captures/ • {capture.type}
                           </span>
                         </div>
                       </div>
@@ -1426,140 +1814,121 @@ export function ProjectFullPageEditor({
                           type="button"
                           onClick={() =>
                             handleSetCover(
-                              "",
-                              githubOgUrl,
-                              `${project.title?.en || project.title?.fa || "Project"} - GitHub Open Graph`
+                              capture.url,
+                              capture.url,
+                              `${project.title?.en || "Project"} - ${capture.name}`,
+                              capture.lowResUrl || undefined
                             )
                           }
-                          disabled={isOgCover || Boolean(isSettingCover)}
+                          disabled={isCurrent || Boolean(isSettingCover)}
                           className={`flex-1 h-8 px-2.5 inline-flex items-center justify-center gap-1.5 text-xs font-bold rounded-lg transition-colors ${
-                            isOgCover
+                            isCurrent
                               ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 cursor-default"
                               : "bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs"
                           }`}
                         >
-                          {isSettingCover === githubOgUrl ? (
+                          {isSettingCover === capture.url ? (
                             <RefreshCw className="w-3 h-3 animate-spin" />
-                          ) : isOgCover ? (
+                          ) : isCurrent ? (
                             <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
                           ) : (
                             <Star className="w-3 h-3" />
                           )}
-                          <span>{isOgCover ? "Active Cover" : "★ Set as Cover"}</span>
+                          <span>{isCurrent ? "Current Cover" : "★ Set as Cover"}</span>
                         </button>
                       </div>
                     </div>
-                  )}
+                  );
+                })}
 
-                  {/* Option 1B: GitHub Open Graph Placeholder for Private Repos */}
-                  {githubRepoFullName && isPrivateRepo && (
-                    <div className="flex flex-col justify-between rounded-xl overflow-hidden border border-dashed border-amber-500/40 bg-amber-500/5 p-4 text-xs space-y-3">
+                {/* 3. Uploaded Gallery Media Assets */}
+                {project.gallery?.map((item, idx) => {
+                  const assetId = item.asset?._id || item.asset?._ref || "";
+                  const assetUrl = item.asset?.url;
+                  const isCurrent = isCurrentCover(assetUrl, assetId);
+
+                  return (
+                    <div
+                      key={item._key || idx}
+                      className={`flex flex-col justify-between rounded-xl overflow-hidden border p-3 transition-all ${
+                        isCurrent
+                          ? "border-emerald-500 bg-emerald-50/20 dark:bg-emerald-950/20 ring-1 ring-emerald-500/30"
+                          : "border-border bg-background hover:border-border/80"
+                      }`}
+                    >
                       <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-bold">
-                          <Lock className="w-4 h-4 shrink-0" />
-                          <span>Open Graph Unavailable</span>
-                        </div>
-                        <p className="text-muted-foreground leading-relaxed">
-                          Open Graph social card cannot be generated because <span dir="ltr" className="font-mono text-foreground font-semibold">{githubRepoFullName}</span> is private on GitHub.
-                        </p>
-                      </div>
-                      <div className="text-[11px] text-muted-foreground bg-muted/60 p-2.5 rounded-lg border border-border">
-                        Upload custom screenshots above to serve as your project cover.
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Option 2: Uploaded Media Assets */}
-                  {project.gallery?.map((item, idx) => {
-                    const assetId = item.asset?._id || item.asset?._ref || "";
-                    const isCurrentCover =
-                      !isOgCover &&
-                      ((project.coverImage?.asset?._id &&
-                        project.coverImage.asset._id === assetId) ||
-                        (project.coverImage?.asset?._ref &&
-                          project.coverImage.asset._ref === assetId));
-
-                    return (
-                      <div
-                        key={item._key || idx}
-                        className={`flex flex-col justify-between rounded-xl overflow-hidden border p-3 transition-all ${
-                          isCurrentCover
-                            ? "border-emerald-500 bg-emerald-50/20 dark:bg-emerald-950/20 ring-1 ring-emerald-500/30"
-                            : "border-border bg-background hover:border-border/80"
-                        }`}
-                      >
-                        <div className="space-y-2">
-                          <div className="relative aspect-video rounded-lg overflow-hidden border border-border bg-muted/40">
-                            <ProjectThumbnail
-                              sanityCoverUrl={item.asset?.url}
-                              sanityAssetId={assetId}
-                              repoFullName={project.github}
-                              alt={item.caption || "Media asset"}
-                              aspectRatio="aspect-video"
-                              badge={
-                                isCurrentCover ? (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-600 text-white">
-                                    <Star className="w-2.5 h-2.5 fill-white" />
-                                    <span>Cover</span>
+                        <div className="relative aspect-video rounded-lg overflow-hidden border border-border bg-muted/40">
+                          <ProjectThumbnail
+                            sanityCoverUrl={assetUrl}
+                            sanityAssetId={assetId}
+                            repoFullName={project.github}
+                            alt={item.caption || "Media asset"}
+                            aspectRatio="aspect-video"
+                            badge={
+                              <div className="flex items-center gap-1.5">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-neutral-900/90 text-white dark:bg-neutral-100 dark:text-neutral-900 shadow-xs">
+                                  <ImageIcon className="w-2.5 h-2.5" />
+                                  <span>Custom Upload</span>
+                                </span>
+                                {isCurrent && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-600 text-white shadow-xs">
+                                    <Check className="w-2.5 h-2.5" />
+                                    <span>Current Cover</span>
                                   </span>
-                                ) : undefined
-                              }
-                            />
-                          </div>
-
-                          <div className="text-xs">
-                            <span className="font-semibold text-foreground block truncate">
-                              {item.caption || `Image ${idx + 1}`}
-                            </span>
-                            <span dir="ltr" className="text-[10px] font-mono text-muted-foreground block text-left truncate">
-                              {assetId ? `ref: ${assetId}` : "External URL"}
-                            </span>
-                          </div>
+                                )}
+                              </div>
+                            }
+                          />
                         </div>
 
-                        {/* Card Controls */}
-                        <div className="flex items-center justify-between gap-2 pt-3 border-t border-border/60 mt-3">
+                        <div className="text-xs">
+                          <span className="font-semibold text-foreground block truncate">
+                            {item.caption || `Image ${idx + 1}`}
+                          </span>
+                          <span dir="ltr" className="text-[10px] font-mono text-muted-foreground block text-left truncate">
+                            {assetId ? `ref: ${assetId}` : "projects/covers/"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Card Controls */}
+                      <div className="flex items-center justify-between gap-2 pt-3 border-t border-border/60 mt-3">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleSetCover(assetId, assetUrl, item.alt || item.caption)
+                          }
+                          disabled={isCurrent || Boolean(isSettingCover)}
+                          className={`flex-1 h-8 px-2.5 inline-flex items-center justify-center gap-1.5 text-xs font-bold rounded-lg transition-colors ${
+                            isCurrent
+                              ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 cursor-default"
+                              : "bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs"
+                          }`}
+                        >
+                          {isSettingCover === assetId ? (
+                            <RefreshCw className="w-3 h-3 animate-spin" />
+                          ) : isCurrent ? (
+                            <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                          ) : (
+                            <Star className="w-3 h-3" />
+                          )}
+                          <span>{isCurrent ? "Current Cover" : "★ Set as Cover"}</span>
+                        </button>
+
+                        <CustomTooltip content="Remove from media" side="top">
                           <button
                             type="button"
-                            onClick={() =>
-                              handleSetCover(assetId, item.asset?.url, item.alt || item.caption)
-                            }
-                            disabled={isCurrentCover || Boolean(isSettingCover)}
-                            className={`flex-1 h-8 px-2.5 inline-flex items-center justify-center gap-1.5 text-xs font-bold rounded-lg transition-colors ${
-                              isCurrentCover
-                                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 cursor-default"
-                                : "bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs"
-                            }`}
+                            onClick={() => handleRemoveGalleryImage(item._key)}
+                            className="p-1.5 rounded-lg border border-border text-muted-foreground hover:text-red-500 transition-colors"
                           >
-                            {isSettingCover === assetId ? (
-                              <RefreshCw className="w-3 h-3 animate-spin" />
-                            ) : isCurrentCover ? (
-                              <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
-                            ) : (
-                              <Star className="w-3 h-3" />
-                            )}
-                            <span>{isCurrentCover ? "Active Cover" : "★ Set as Cover"}</span>
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
-
-                          <CustomTooltip content="Remove from media" side="top">
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveGalleryImage(item._key)}
-                              className="p-1.5 rounded-lg border border-border text-muted-foreground hover:text-red-500 transition-colors"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </CustomTooltip>
-                        </div>
+                        </CustomTooltip>
                       </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="p-8 text-center text-xs text-muted-foreground border border-dashed border-border rounded-xl">
-                  No media assets yet. Upload screenshots or connect a GitHub repository to access the Open Graph card.
-                </div>
-              )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}

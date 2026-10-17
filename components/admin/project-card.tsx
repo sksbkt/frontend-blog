@@ -17,6 +17,7 @@ import { ProjectThumbnail } from "./project-thumbnail";
 import { LanguageBar } from "@/components/ui/language-bar";
 import { TechBadgeGroup } from "@/components/ui/tech-badge-group";
 import { CustomTooltip } from "@/components/ui/custom-tooltip";
+import { ProjectAuditBadge } from "@/components/projects/project-audit-badge";
 import type { RepositoryItem, RepoAuditItem, SanityProject } from "./types";
 
 export interface ProjectCardProps {
@@ -73,6 +74,11 @@ export function ProjectCard({
   // Resolve raw languages
   const rawLanguages = projectRecord?.rawLanguages || repo.languages;
 
+  const displayTitle =
+    (locale === "fa"
+      ? projectRecord?.title?.fa?.trim() || projectRecord?.title?.en?.trim()
+      : projectRecord?.title?.en?.trim() || projectRecord?.title?.fa?.trim()) || repo.name;
+
   return (
     <div
       onClick={handleCardClick}
@@ -90,7 +96,7 @@ export function ProjectCard({
             }
             sanityGifUrl={projectRecord?.previewGif?.asset?.url}
             showGif={Boolean(projectRecord?.previewGif?.asset?.url)}
-            alt={repo.name}
+            alt={displayTitle}
             aspectRatio="aspect-video"
             className="rounded-xl overflow-hidden shadow-2xs group-hover:scale-[1.01] transition-transform duration-300"
           />
@@ -108,11 +114,11 @@ export function ProjectCard({
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             <h3
-              dir="ltr"
+              dir={locale === "fa" && projectRecord?.title?.fa ? "rtl" : "ltr"}
               className="font-bold text-base text-foreground truncate font-sans text-left group-hover:text-primary transition-colors"
-              title={repo.name}
+              title={displayTitle}
             >
-              {repo.name}
+              {displayTitle}
             </h3>
             <p
               dir="ltr"
@@ -122,15 +128,27 @@ export function ProjectCard({
             </p>
           </div>
 
-          {score !== undefined && (
-            <span
-              dir="ltr"
-              className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-md border shrink-0 tabular-nums ${scoreClass}`}
-              title={`Audit Score: ${score}/100`}
-            >
-              {score}
-            </span>
-          )}
+          <div
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+          >
+            <ProjectAuditBadge
+              project={{
+                id: projectRecord?._id || repo.name,
+                slug: projectRecord?.slug?.current || repo.name,
+                auditScore:
+                  typeof projectRecord?.auditScore === "number"
+                    ? projectRecord.auditScore
+                    : score ?? null,
+                auditBreakdown: projectRecord?.auditBreakdown ?? null,
+                auditedAt: projectRecord?.auditedAt ?? null,
+              }}
+              isAdmin={true}
+              locale={locale}
+            />
+          </div>
         </div>
 
         {/* Description */}

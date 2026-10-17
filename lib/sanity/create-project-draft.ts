@@ -1,5 +1,14 @@
-import { writeClient } from "@/lib/sanity/write-client";
-import { resolveTechnologies } from "@/lib/sanity/technology-registry";
+/**
+ * © 2026 Root Zero Systems Lab™. All rights reserved.
+ * 
+ * Project Draft Creation Service
+ * Persists AI-analyzed and imported project drafts directly into PostgreSQL via Prisma
+ * and routes all cover imagery through Universal Sovereign Asset Pipeline (Supabase Storage).
+ */
+
+import { prisma } from "@/lib/prisma";
+import { ensureSovereignAsset } from "@/lib/asset-pipeline";
+import { revalidateTag } from "next/cache";
 
 type LocalizedText = {
   en: string;
@@ -36,7 +45,6 @@ function normalizeSlug(value: string) {
 function validateUrl(value: string, fieldName: string) {
   try {
     const url = new URL(value);
-
     if (!["http:", "https:"].includes(url.protocol)) {
       throw new Error();
     }
@@ -72,12 +80,6 @@ function validateProject(project: ProjectDraftInput) {
     if (!technology.name.trim()) {
       throw new Error("Technology name cannot be empty.");
     }
-
-    if (!technology.description.trim()) {
-      throw new Error(
-        `Technology description is required for "${technology.name}".`,
-      );
-    }
   }
 
   if (
@@ -86,136 +88,88 @@ function validateProject(project: ProjectDraftInput) {
   ) {
     throw new Error("Project overview is required.");
   }
-
-  if (
-    !project.content.challenges.en.trim() ||
-    !project.content.challenges.fa.trim()
-  ) {
-    throw new Error("Project challenges are required.");
-  }
-
-  if (
-    !project.content.outcome.en.trim() ||
-    !project.content.outcome.fa.trim()
-  ) {
-    throw new Error("Project outcome is required.");
-  }
 }
 
-function getGitHubSocialImageUrl(githubUrl: string) {
-  const url = new URL(githubUrl);
-
-  if (url.hostname !== "github.com") {
-    throw new Error("Invalid GitHub URL.");
-  }
-
-  const parts = url.pathname.split("/").filter(Boolean);
-
-  if (parts.length < 2) {
-    throw new Error("Invalid GitHub repository URL.");
-  }
-
-  const owner = parts[0];
-  const repository = parts[1].replace(/\.git$/, "");
-
-  return `https://opengraph.githubassets.com/1/${owner}/${repository}`;
-}
-
-async function uploadProjectImage(githubUrl: string, title: string) {
+function getGitHubSocialImageUrl(githubUrl: string): string | null {
   try {
-    const imageUrl = getGitHubSocialImageUrl(githubUrl);
-    const response = await fetch(imageUrl);
+    const url = new URL(githubUrl);
+    if (url.hostname !== "github.com") return null;
 
-    if (response.ok) {
-      const contentType = response.headers.get("content-type") ?? "image/png";
-      const imageBuffer = Buffer.from(await response.arrayBuffer());
+    const parts = url.pathname.split("/").filter(Boolean);
+    if (parts.length < 2) return null;
 
-      const asset = await writeClient.assets.upload("image", imageBuffer, {
-        filename: `${title.toLowerCase().replace(/\s+/g, "-")}.png`,
-        contentType,
-      });
-
-      return {
-        _type: "image",
-        asset: {
-          _type: "reference",
-          _ref: asset._id,
-        },
-        alt: title,
-      };
-    }
-  } catch (err) {
-    console.warn(
-      "GitHub social image download failed, generating fallback image asset:",
-      err,
-    );
+    const owner = parts[0];
+    const repository = parts[1].replace(/\.git$/, "");
+    return `https://opengraph.githubassets.com/1/${owner}/${repository}`;
+  } catch {
+    return null;
   }
-
-  // Fallback: Minimal 1x1 PNG asset so Sanity draft creation succeeds even when GitHub opengraph rate-limits
-  const fallbackPng = Buffer.from(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
-    "base64",
-  );
-
-  const fallbackAsset = await writeClient.assets.upload("image", fallbackPng, {
-    filename: `${title.toLowerCase().replace(/\s+/g, "-")}-placeholder.png`,
-    contentType: "image/png",
-  });
-
-  return {
-    _type: "image",
-    asset: {
-      _type: "reference",
-      _ref: fallbackAsset._id,
-    },
-    alt: title,
-  };
 }
 
 export async function createProjectDraft(project: ProjectDraftInput) {
-  const technologies = await resolveTechnologies(project.technologies);
-
-  const normalizedProject = {
-    ...project,
-    slug: normalizeSlug(project.slug),
-    technologies,
-  };
+  const normalizedSlug = normalizeSlug(project.slug || project.title.en);
 
   validateProject({
-    ...normalizedProject,
-    technologies: project.technologies,
+    ...project,
+    slug: normalizedSlug,
   });
 
-  const draftId = `drafts.${crypto.randomUUID()}`;
+  // Ingest cover image into Supabase Storage
+  let sovereignCoverUrl: string | null = null;
+  const ogUrl = getGitHubSocialImageUrl(project.github);
+  if (ogUrl) {
+    try {
+      sovereignCoverUrl = await ensureSovereignAsset(ogUrl, {
+        folder: "covers",
+        customFileName: `${normalizedSlug}-og.png`,
+      });
+    } catch (err) {
+      console.warn("[ProjectDraft] Warning ingesting sovereign OG image:", err);
+    }
+  }
 
-  const image = await uploadProjectImage(
-    normalizedProject.github,
-    normalizedProject.title.en,
-  );
+  const techNames = project.technologies.map((t) => t.name.trim()).filter(Boolean);
 
-  return writeClient.create({
-    _id: draftId,
-    _type: "project",
-
-    title: normalizedProject.title,
-
-    slug: {
-      _type: "slug",
-      current: normalizedProject.slug,
+  // Persist directly into PostgreSQL via Prisma
+  const savedProject = await prisma.project.upsert({
+    where: { slug: normalizedSlug },
+    create: {
+      slug: normalizedSlug,
+      title: project.title.en,
+      taglineEn: project.description.en,
+      taglineFa: project.description.fa,
+      descriptionEn: project.content.overview.en,
+      descriptionFa: project.content.overview.fa,
+      coverImageUrl: sovereignCoverUrl,
+      githubUrl: project.github,
+      liveUrl: project.demo || null,
+      isPublished: false,
+      featured: false,
+      technologies: techNames,
     },
-
-    description: normalizedProject.description,
-
-    image,
-
-    technologies: normalizedProject.technologies,
-
-    github: normalizedProject.github,
-
-    demo: normalizedProject.demo || "",
-
-    featured: false,
-
-    content: normalizedProject.content,
+    update: {
+      title: project.title.en,
+      taglineEn: project.description.en,
+      taglineFa: project.description.fa,
+      descriptionEn: project.content.overview.en,
+      descriptionFa: project.content.overview.fa,
+      coverImageUrl: sovereignCoverUrl || undefined,
+      githubUrl: project.github,
+      liveUrl: project.demo || null,
+      technologies: techNames,
+    },
   });
+
+  try {
+    revalidateTag("projects", "max");
+    revalidateTag(`project:${savedProject.id}`, "max");
+    revalidateTag(`project:${savedProject.slug}`, "max");
+  } catch {}
+
+  return {
+    _id: savedProject.id,
+    id: savedProject.id,
+    slug: savedProject.slug,
+    project: savedProject,
+  };
 }

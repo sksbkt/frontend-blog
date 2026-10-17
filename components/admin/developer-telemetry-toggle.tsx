@@ -17,11 +17,13 @@ export function DeveloperTelemetryToggle({
   const { isTelemetryEnabled, isHudOpen, toggleTelemetry, setIsHudOpen } = useTelemetryStore();
 
   const handleToggle = () => {
-    if (!isTelemetryEnabled) {
-      toggleTelemetry();
+    if (!isHudOpen) {
+      if (!isTelemetryEnabled) {
+        toggleTelemetry();
+      }
       setIsHudOpen(true);
     } else {
-      setIsHudOpen(!isHudOpen);
+      setIsHudOpen(false);
     }
   };
 
@@ -38,20 +40,18 @@ export function DeveloperTelemetryToggle({
       <button
         type="button"
         onClick={handleToggle}
-        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all shadow-xs min-h-[36px] ${
-          isTelemetryEnabled
-            ? isHudOpen
-              ? "border-emerald-500 bg-emerald-500/20 text-emerald-800 dark:text-emerald-200 ring-2 ring-emerald-500/20"
-              : "border-emerald-500/50 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all shadow-xs min-h-[36px] cursor-pointer ${
+          isHudOpen
+            ? "border-emerald-500 bg-emerald-500/20 text-emerald-800 dark:text-emerald-200 ring-2 ring-emerald-500/20"
             : "border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted"
         }`}
         title="Developer Telemetry HUD: Toggle HUD Window (Ctrl+Shift+H)"
       >
-        <Activity className={`w-3.5 h-3.5 ${isTelemetryEnabled ? "animate-pulse text-emerald-500" : ""}`} />
+        <Activity className={`w-3.5 h-3.5 ${isHudOpen ? "animate-pulse text-emerald-500" : "text-muted-foreground"}`} />
         <span className="hidden lg:inline">Telemetry HUD</span>
         <span
           className={`w-2 h-2 rounded-full ${
-            isTelemetryEnabled ? "bg-emerald-500 shadow-xs shadow-emerald-500/50" : "bg-muted-foreground/40"
+            isHudOpen ? "bg-emerald-500 shadow-xs shadow-emerald-500/50" : "bg-muted-foreground/40"
           }`}
         />
       </button>

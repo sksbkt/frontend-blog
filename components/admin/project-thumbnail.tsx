@@ -3,29 +3,10 @@
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { FolderGit2, Play, Image as ImageIcon } from "lucide-react";
-import { urlFor } from "@/lib/sanity/client";
-
-function resolveSanityUrl(src?: string): string | undefined {
+function resolveImageUrl(src?: string): string | undefined {
   if (!src) return undefined;
   if (src.startsWith("http://") || src.startsWith("https://") || src.startsWith("/")) {
     return src;
-  }
-  if (src.startsWith("image-")) {
-    try {
-      return urlFor(src).url();
-    } catch {
-      const parts = src.split("-");
-      if (parts.length >= 4) {
-        const hash = parts[1];
-        const dim = parts[2];
-        const ext = parts[3];
-        const pId = process.env.NEXT_PUBLIC_SANITY_PROJECT_ID;
-        const dSet = process.env.NEXT_PUBLIC_SANITY_DATASET;
-        if (pId && dSet) {
-          return `https://cdn.sanity.io/images/${pId}/${dSet}/${hash}-${dim}.${ext}`;
-        }
-      }
-    }
   }
   return undefined;
 }
@@ -62,13 +43,13 @@ export function ProjectThumbnail({
     const list: string[] = [];
 
     // 1. Animated GIF if requested and present
-    const resolvedGif = resolveSanityUrl(sanityGifUrl);
+    const resolvedGif = resolveImageUrl(sanityGifUrl);
     if (showGif && resolvedGif) {
       list.push(resolvedGif);
     }
 
-    // 2. Uploaded Sanity Cover Asset
-    const resolvedCover = resolveSanityUrl(sanityCoverUrl) || resolveSanityUrl(sanityAssetId);
+    // 2. Uploaded Sovereign Cover Asset
+    const resolvedCover = resolveImageUrl(sanityCoverUrl) || resolveImageUrl(sanityAssetId);
     if (resolvedCover) {
       list.push(resolvedCover);
     }

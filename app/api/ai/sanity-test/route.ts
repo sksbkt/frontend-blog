@@ -1,24 +1,22 @@
 import { NextResponse } from "next/server";
-
-import { writeClient } from "@/lib/sanity/write-client";
+import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   try {
-    const result = await writeClient.fetch<number>(
-      "count(*[_type == 'project'])",
-    );
+    const result = await prisma.project.count();
 
     return NextResponse.json({
       success: true,
+      database: "postgresql",
       projectCount: result,
     });
   } catch (error) {
-    console.error("Sanity write client test error:", error);
+    console.error("Database health check error:", error);
 
     return NextResponse.json(
       {
         success: false,
-        message: "Sanity connection failed.",
+        message: "Database connection failed.",
       },
       { status: 500 },
     );

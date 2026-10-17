@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import type { Project } from "@/types/project";
-import { getGitHubOpenGraphUrl } from "@/lib/sanity/mappers";
+import { getGitHubOpenGraphUrl } from "@/lib/github/opengraph";
+import { getOrCacheGithubOgImage } from "@/lib/github-og-cache";
 
 export function mapPrismaProjectToDomain(p: {
   id: string;
@@ -11,6 +12,8 @@ export function mapPrismaProjectToDomain(p: {
   descriptionEn: string;
   descriptionFa: string;
   coverImageUrl?: string | null;
+  lowResCoverUrl?: string | null;
+  assetSource?: string | null;
   githubUrl?: string | null;
   liveUrl?: string | null;
   order: number;
@@ -19,6 +22,9 @@ export function mapPrismaProjectToDomain(p: {
   technologies: string[];
   languages?: unknown;
   aiContextDigest?: unknown;
+  auditScore?: number | null;
+  auditBreakdown?: unknown;
+  auditedAt?: Date | string | null;
 }): Project {
   const openGraphImage = getGitHubOpenGraphUrl(p.githubUrl || undefined) ?? undefined;
   const image = p.coverImageUrl || openGraphImage || "/images/projects/frontend-blog.jpg";
@@ -35,7 +41,10 @@ export function mapPrismaProjectToDomain(p: {
       fa: p.taglineFa || p.title || "",
     },
     image,
+    lowResImage: p.lowResCoverUrl || null,
     coverImage: p.coverImageUrl || undefined,
+    lowResCoverUrl: p.lowResCoverUrl || null,
+    assetSource: p.assetSource || null,
     openGraphImage,
     technologies: p.technologies || [],
     github: p.githubUrl || undefined,
@@ -57,6 +66,9 @@ export function mapPrismaProjectToDomain(p: {
     },
     languages: Array.isArray(p.languages) ? (p.languages as any) : [],
     aiContextDigest: (p.aiContextDigest as any) || null,
+    auditScore: typeof p.auditScore === "number" ? p.auditScore : null,
+    auditBreakdown: (p.auditBreakdown as any) || null,
+    auditedAt: p.auditedAt ? new Date(p.auditedAt).toISOString() : null,
   };
 }
 
@@ -69,7 +81,29 @@ export async function getDbProjects(): Promise<Project[]> {
       where: { isPublished: true },
       orderBy: [{ order: "asc" }, { createdAt: "desc" }],
     });
-    return projects.map(mapPrismaProjectToDomain);
+
+    const domainProjects = await Promise.all(
+      projects.map(async (p) => {
+        let sovereignCover = p.coverImageUrl;
+        if (!sovereignCover && p.githubUrl) {
+          const match = p.githubUrl.match(/github\.com\/([^/]+)\/([^/]+)/i);
+          if (match) {
+            try {
+              sovereignCover = await getOrCacheGithubOgImage(
+                match[1],
+                match[2].replace(/\.git$/i, "")
+              );
+            } catch {}
+          }
+        }
+        return mapPrismaProjectToDomain({
+          ...p,
+          coverImageUrl: sovereignCover || p.coverImageUrl,
+        });
+      })
+    );
+
+    return domainProjects;
   } catch (error) {
     console.error("[ProjectService] Failed to fetch projects from database:", error);
     return [];
@@ -85,7 +119,24 @@ export async function getDbProjectBySlug(slug: string): Promise<Project | null> 
       where: { slug },
     });
     if (!project) return null;
-    return mapPrismaProjectToDomain(project);
+
+    let sovereignCover = project.coverImageUrl;
+    if (!sovereignCover && project.githubUrl) {
+      const match = project.githubUrl.match(/github\.com\/([^/]+)\/([^/]+)/i);
+      if (match) {
+        try {
+          sovereignCover = await getOrCacheGithubOgImage(
+            match[1],
+            match[2].replace(/\.git$/i, "")
+          );
+        } catch {}
+      }
+    }
+
+    return mapPrismaProjectToDomain({
+      ...project,
+      coverImageUrl: sovereignCover || project.coverImageUrl,
+    });
   } catch (error) {
     console.error(`[ProjectService] Failed to fetch project '${slug}' from database:`, error);
     return null;
@@ -104,7 +155,29 @@ export async function getDbFeaturedProjects(): Promise<Project[]> {
       },
       orderBy: [{ order: "asc" }, { createdAt: "desc" }],
     });
-    return projects.map(mapPrismaProjectToDomain);
+
+    const domainProjects = await Promise.all(
+      projects.map(async (p) => {
+        let sovereignCover = p.coverImageUrl;
+        if (!sovereignCover && p.githubUrl) {
+          const match = p.githubUrl.match(/github\.com\/([^/]+)\/([^/]+)/i);
+          if (match) {
+            try {
+              sovereignCover = await getOrCacheGithubOgImage(
+                match[1],
+                match[2].replace(/\.git$/i, "")
+              );
+            } catch {}
+          }
+        }
+        return mapPrismaProjectToDomain({
+          ...p,
+          coverImageUrl: sovereignCover || p.coverImageUrl,
+        });
+      })
+    );
+
+    return domainProjects;
   } catch (error) {
     console.error("[ProjectService] Failed to fetch featured projects:", error);
     return [];
@@ -120,8 +193,8 @@ export function mapPrismaToAdminProject(p: any) {
     _createdAt: p.createdAt?.toISOString?.() || new Date().toISOString(),
     _updatedAt: p.updatedAt?.toISOString?.() || new Date().toISOString(),
     title: {
-      en: p.title || p.slug,
-      fa: p.taglineFa || p.title || p.slug,
+      en: p.title || "",
+      fa: p.taglineFa || "",
     },
     slug: { current: p.slug },
     description: {
@@ -149,5 +222,8 @@ export function mapPrismaToAdminProject(p: any) {
       : undefined,
     aiContextDigest: p.aiContextDigest || undefined,
     languages: Array.isArray(p.languages) ? p.languages : undefined,
+    auditScore: typeof p.auditScore === "number" ? p.auditScore : null,
+    auditBreakdown: p.auditBreakdown || null,
+    auditedAt: p.auditedAt ? new Date(p.auditedAt).toISOString() : null,
   };
 }

@@ -11,6 +11,7 @@ import {
   RefreshCw,
   Eye,
   FileCode,
+  UploadCloud,
 } from "lucide-react";
 import { FaGithub as Github } from "react-icons/fa";
 import { useTranslations } from "next-intl";
@@ -25,11 +26,13 @@ interface RepoActionsMenuProps {
   isAuditing: boolean;
   isDeployingVercel: boolean;
   isCiCapturing: boolean;
+  isImporting?: boolean;
   dropUp?: boolean;
   onAnalyze: () => void;
   onAudit: () => void;
   onDeployVercel: () => void;
   onCaptureAssets: () => void;
+  onImportToLab?: () => void;
 }
 
 export function RepoActionsMenu({
@@ -41,11 +44,13 @@ export function RepoActionsMenu({
   isAuditing,
   isDeployingVercel,
   isCiCapturing,
+  isImporting = false,
   dropUp = false,
   onAnalyze,
   onAudit,
   onDeployVercel,
   onCaptureAssets,
+  onImportToLab,
 }: RepoActionsMenuProps) {
   const t = useTranslations("admin.masterDetail.actions");
   const [isOpen, setIsOpen] = useState(false);
@@ -84,6 +89,27 @@ export function RepoActionsMenu({
             dropUp ? "bottom-full mb-2" : "top-full mt-2"
           } w-56 rounded-2xl border border-neutral-200 dark:border-neutral-700/80 bg-white dark:bg-neutral-900 p-1.5 shadow-xl z-50 animate-in fade-in-50 zoom-in-95 duration-150 backdrop-blur-md`}
         >
+          {/* Action: Import to Lab */}
+          {repo.importStatus === "none" && onImportToLab && (
+            <button
+              type="button"
+              role="menuitem"
+              disabled={isImporting}
+              onClick={() => {
+                setIsOpen(false);
+                onImportToLab();
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-xl text-start text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors disabled:opacity-50"
+            >
+              {isImporting ? (
+                <RefreshCw className="w-4 h-4 animate-spin text-emerald-500 shrink-0" />
+              ) : (
+                <UploadCloud className="w-4 h-4 text-emerald-500 shrink-0" />
+              )}
+              <span className="truncate">Import to Lab</span>
+            </button>
+          )}
+
           {/* Action: AI Generate / Re-generate Draft */}
           <button
             type="button"

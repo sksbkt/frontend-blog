@@ -50,7 +50,12 @@ export default function StatusPageCard({
   autoReconnect = false,
 }: StatusPageCardProps) {
   const router = useRouter();
-  const locale = useLocale();
+  let locale = "en";
+  try {
+    locale = useLocale();
+  } catch {
+    locale = "en";
+  }
   const isFa = locale === "fa";
   const [, startTransition] = useTransition();
 

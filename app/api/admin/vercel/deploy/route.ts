@@ -7,7 +7,7 @@ import {
   waitForDeployment,
 } from "@/lib/services/vercel";
 import { deployAssetRunnerToRepo } from "@/lib/github/asset-runner-deployer";
-import { writeClient } from "@/lib/sanity/write-client";
+import { prisma } from "@/lib/prisma";
 
 export async function POST(request: Request) {
   const session = await getSession();
@@ -55,24 +55,23 @@ export async function POST(request: Request) {
     console.log(`[Vercel Pipeline] Awaiting READY status for deployment ${deployment.id}...`);
     const { liveUrl } = await waitForDeployment(deployment.id);
 
-    // 5. Update matching Sanity project document (draft or published) with the live demo URL
+    // 5. Update matching database project document with the live demo URL
     try {
-      const matchingProjects = await writeClient.fetch(
-        `*[_type == "project" && (github match $pattern || github match $exact)]{ _id }`,
-        {
-          pattern: `*${fullName}*`,
-          exact: `*${repo}*`,
-        }
-      );
-
-      if (matchingProjects && matchingProjects.length > 0) {
-        for (const proj of matchingProjects) {
-          await writeClient.patch(proj._id).set({ demo: liveUrl }).commit();
-          console.log(`[Vercel Pipeline] Updated Sanity project ${proj._id} demo to ${liveUrl}`);
-        }
-      }
-    } catch (sanityErr) {
-      console.warn("[Vercel Pipeline] Non-critical warning updating Sanity demo link:", sanityErr);
+      const updatedProjects = await prisma.project.updateMany({
+        where: {
+          OR: [
+            { githubUrl: { contains: fullName, mode: "insensitive" } },
+            { githubUrl: { contains: repo, mode: "insensitive" } },
+            { slug: repo.toLowerCase() },
+          ],
+        },
+        data: {
+          liveUrl,
+        },
+      });
+      console.log(`[Vercel Pipeline] Updated ${updatedProjects.count} database project(s) demo to ${liveUrl}`);
+    } catch (dbErr) {
+      console.warn("[Vercel Pipeline] Non-critical warning updating database demo link:", dbErr);
     }
 
     // 6. Trigger automated visual capture with live URL

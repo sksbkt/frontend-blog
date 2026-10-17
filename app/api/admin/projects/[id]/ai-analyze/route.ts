@@ -134,14 +134,28 @@ export async function POST(req: Request, { params }: RouteParams) {
           existingProject?.descriptionFa ||
           "";
 
+        // Ensure sovereign cover asset and sanitize content images
+        let sovereignCoverUrl = existingProject?.coverImageUrl;
+        if (!sovereignCoverUrl && owner && repo) {
+          try {
+            const { getOrCacheGithubOgImage } = await import("@/lib/github-og-cache");
+            sovereignCoverUrl = await getOrCacheGithubOgImage(owner, repo);
+          } catch {}
+        }
+
+        const { sanitizeContentImages } = await import("@/lib/asset-pipeline");
+        const sovereignDescEn = await sanitizeContentImages(descriptionEn, { folder: "content" });
+        const sovereignDescFa = await sanitizeContentImages(descriptionFa, { folder: "content" });
+
         const finalProject = await prisma.project.upsert({
           where: { slug: targetSlug },
           update: {
             title,
             taglineEn,
             taglineFa,
-            descriptionEn,
-            descriptionFa,
+            descriptionEn: sovereignDescEn,
+            descriptionFa: sovereignDescFa,
+            coverImageUrl: sovereignCoverUrl || existingProject?.coverImageUrl || null,
             technologies:
               deepScanResult.technologies || existingProject?.technologies || [],
             githubUrl:
@@ -157,8 +171,9 @@ export async function POST(req: Request, { params }: RouteParams) {
             title,
             taglineEn,
             taglineFa,
-            descriptionEn,
-            descriptionFa,
+            descriptionEn: sovereignDescEn,
+            descriptionFa: sovereignDescFa,
+            coverImageUrl: sovereignCoverUrl || null,
             technologies: deepScanResult.technologies || [],
             githubUrl: deepScanResult.github || `https://github.com/${fullName}`,
             liveUrl: deepScanResult.demo || null,

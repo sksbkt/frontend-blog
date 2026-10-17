@@ -58,7 +58,10 @@ function connectSSE() {
     return;
   }
 
-  state.connectionStatus = reconnectAttempts > 0 ? "reconnecting" : "connecting" as any;
+  state = {
+    ...state,
+    connectionStatus: reconnectAttempts > 0 ? "reconnecting" : ("connecting" as any),
+  };
   emitChange();
 
   try {
@@ -66,7 +69,7 @@ function connectSSE() {
 
     eventSource.onopen = () => {
       reconnectAttempts = 0;
-      state.connectionStatus = "connected";
+      state = { ...state, connectionStatus: "connected" };
       emitChange();
     };
 
@@ -84,7 +87,7 @@ function connectSSE() {
           if (current.length > MAX_EVENTS_HISTORY) {
             current.pop();
           }
-          state.events = current;
+          state = { ...state, events: current };
           emitChange();
         }
       } catch (err) {
@@ -93,7 +96,7 @@ function connectSSE() {
     };
 
     eventSource.onerror = () => {
-      state.connectionStatus = "reconnecting";
+      state = { ...state, connectionStatus: "reconnecting" };
       emitChange();
       eventSource?.close();
       eventSource = null;
@@ -108,7 +111,7 @@ function connectSSE() {
     };
   } catch (err) {
     console.error("[TelemetryClient] Connection failed:", err);
-    state.connectionStatus = "error";
+    state = { ...state, connectionStatus: "error" };
     emitChange();
   }
 }
@@ -123,7 +126,7 @@ function disconnectSSE() {
     eventSource = null;
   }
   reconnectAttempts = 0;
-  state.connectionStatus = "idle";
+  state = { ...state, connectionStatus: "idle" };
   emitChange();
 }
 
@@ -135,7 +138,7 @@ if (typeof window !== "undefined" && state.isEnabled) {
 export const telemetryStore = {
   getState: () => state,
   setEnabled: (value: boolean) => {
-    state.isEnabled = value;
+    state = { ...state, isEnabled: value };
     if (typeof window !== "undefined") {
       try {
         localStorage.setItem(STORAGE_KEY_ENABLED, String(value));
@@ -152,7 +155,7 @@ export const telemetryStore = {
     telemetryStore.setEnabled(!state.isEnabled);
   },
   setHudOpen: (open: boolean) => {
-    state.isHudOpen = open;
+    state = { ...state, isHudOpen: open };
     if (typeof window !== "undefined") {
       try {
         localStorage.setItem(STORAGE_KEY_HUD_OPEN, String(open));
@@ -164,13 +167,13 @@ export const telemetryStore = {
     telemetryStore.setHudOpen(!state.isHudOpen);
   },
   clearEvents: () => {
-    state.events = [];
+    state = { ...state, events: [] };
     emitChange();
   },
   addLocalEvent: (event: TelemetryStreamEvent) => {
     const current = [event, ...state.events];
     if (current.length > MAX_EVENTS_HISTORY) current.pop();
-    state.events = current;
+    state = { ...state, events: current };
     emitChange();
   },
   subscribe: (listener: () => void) => {

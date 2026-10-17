@@ -28,7 +28,6 @@ const technologyDescriptions: Record<string, string> = {
   GSAP: "An animation library for creating high-performance web animations.",
   SVG: "A vector graphics format used for scalable web graphics.",
   Vite: "A fast frontend build tool and development server.",
-  Sanity: "A headless CMS for managing structured content.",
   Netlify: "A platform for deploying and hosting modern web applications.",
   Vercel: "A platform for deploying frontend and full-stack applications.",
 };

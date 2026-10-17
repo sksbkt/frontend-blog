@@ -3,6 +3,7 @@ import { revalidateTag } from "next/cache";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import { mapPrismaToAdminProject } from "@/lib/services/project-service";
+import { ensureSovereignAsset, sanitizeContentImages } from "@/lib/asset-pipeline";
 
 export async function GET() {
   const session = await getSession();
@@ -167,20 +168,31 @@ export async function PATCH(request: Request) {
     }
 
     // Resolve cover image URL if provided
-    let coverImageUrl: string | undefined = undefined;
-    if (data.coverImage) {
-      coverImageUrl =
+    let rawCoverImageUrl: string | undefined = undefined;
+    if (body.coverImageUrl !== undefined) {
+      rawCoverImageUrl = body.coverImageUrl ? String(body.coverImageUrl).trim() : "";
+    } else if (data.coverImageUrl !== undefined) {
+      rawCoverImageUrl = data.coverImageUrl ? String(data.coverImageUrl).trim() : "";
+    } else if (data.coverImage) {
+      rawCoverImageUrl =
         data.coverImage.asset?.url ||
         data.coverImage.url ||
         (typeof data.coverImage === "string" ? data.coverImage : undefined);
     } else if (data.image) {
-      coverImageUrl =
+      rawCoverImageUrl =
         data.image.asset?.url ||
         data.image.url ||
         (typeof data.image === "string" ? data.image : undefined);
     }
 
     const updatePayload: Record<string, any> = {};
+
+    if (rawCoverImageUrl) {
+      const sovereignUrl = await ensureSovereignAsset(rawCoverImageUrl, { folder: "covers" });
+      updatePayload.coverImageUrl = sovereignUrl;
+    } else if (rawCoverImageUrl === "") {
+      updatePayload.coverImageUrl = null;
+    }
 
     if (data.title) {
       updatePayload.title =
@@ -194,17 +206,25 @@ export async function PATCH(request: Request) {
 
     if (data.description) {
       if (typeof data.description === "object") {
-        if (data.description.en !== undefined) updatePayload.taglineEn = data.description.en;
-        if (data.description.fa !== undefined) updatePayload.taglineFa = data.description.fa;
+        if (data.description.en !== undefined) {
+          updatePayload.taglineEn = await sanitizeContentImages(data.description.en, { folder: "content" });
+        }
+        if (data.description.fa !== undefined) {
+          updatePayload.taglineFa = await sanitizeContentImages(data.description.fa, { folder: "content" });
+        }
       } else {
-        updatePayload.taglineEn = data.description;
+        updatePayload.taglineEn = await sanitizeContentImages(data.description, { folder: "content" });
       }
     }
 
     if (data.content?.overview) {
       if (typeof data.content.overview === "object") {
-        if (data.content.overview.en !== undefined) updatePayload.descriptionEn = data.content.overview.en;
-        if (data.content.overview.fa !== undefined) updatePayload.descriptionFa = data.content.overview.fa;
+        if (data.content.overview.en !== undefined) {
+          updatePayload.descriptionEn = await sanitizeContentImages(data.content.overview.en, { folder: "content" });
+        }
+        if (data.content.overview.fa !== undefined) {
+          updatePayload.descriptionFa = await sanitizeContentImages(data.content.overview.fa, { folder: "content" });
+        }
       }
     }
 
@@ -222,10 +242,6 @@ export async function PATCH(request: Request) {
 
     if (data.featured !== undefined) {
       updatePayload.featured = Boolean(data.featured);
-    }
-
-    if (coverImageUrl) {
-      updatePayload.coverImageUrl = coverImageUrl;
     }
 
     if (data.aiContextDigest !== undefined) {

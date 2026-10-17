@@ -35,7 +35,10 @@ export type Project = {
   slug: string;
   description: LocalizedText;
   image: string;
+  lowResImage?: string | null;
   coverImage?: string;
+  lowResCoverUrl?: string | null;
+  assetSource?: string | null;
   openGraphImage?: string;
   gallery?: ProjectGalleryItem[];
   video?: ProjectVideo;
@@ -48,6 +51,22 @@ export type Project = {
   rawLanguages?: Record<string, number> | string;
   languages?: ProjectLanguageItem[];
   aiContextDigest?: Record<string, unknown> | null;
+  auditScore?: number | null;
+  auditBreakdown?: {
+    score: number;
+    breakdown: {
+      languages: number;
+      assets: number;
+      architecture: number;
+      technologies: number;
+    };
+    strengths: string[];
+    weaknesses: string[];
+    strengthsFa?: string[];
+    weaknessesFa?: string[];
+    auditedAt?: string;
+  } | null;
+  auditedAt?: string | null;
 };
 
 

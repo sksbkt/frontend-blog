@@ -6,7 +6,6 @@ import {
   polishBilingualField,
 } from "@/lib/gemini/analyzer";
 import { isRateLimitOrCapacityError } from "@/lib/gemini/queue";
-import { writeClient } from "@/lib/sanity/write-client";
 import { prisma } from "@/lib/prisma";
 import type { AiContextDigest } from "@/components/admin/types";
 
@@ -61,22 +60,6 @@ export async function POST(request: Request, { params }: RouteParams) {
 
       if (dbProject?.aiContextDigest) {
         digest = dbProject.aiContextDigest as AiContextDigest;
-      } else {
-        const docs = await writeClient.fetch<
-          Array<{ _id: string; aiContextDigest?: AiContextDigest }>
-        >(
-          `*[_type == "project" && (_id == $id || _id == $draftId || slug.current == $id || title.en == $id)] | order(_updatedAt desc){ _id, aiContextDigest }`,
-          { id: decodedId, draftId }
-        );
-        const doc =
-          docs.find(
-            (d) =>
-              d._id.startsWith("drafts.") &&
-              (d.aiContextDigest?.rawDigest || d.aiContextDigest?.summary)
-          ) ||
-          docs.find((d) => d.aiContextDigest?.rawDigest || d.aiContextDigest?.summary) ||
-          docs[0];
-        digest = doc?.aiContextDigest;
       }
     }
 
